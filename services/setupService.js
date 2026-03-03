@@ -4,6 +4,7 @@ const axios = require('axios');
 const { OpenAI } = require('openai');
 const config = require('../config/config');
 const AzureOpenAI = require('openai').AzureOpenAI;
+const { GoogleGenAI } = require('@google/genai');
 
 class SetupService {
   constructor() {
@@ -151,6 +152,27 @@ class SetupService {
     }
   }
 
+  async validateGeminiConfig(apiKey, model) {
+    if (config.CONFIGURED === false) {
+      try {
+        const ai = new GoogleGenAI({ apiKey });
+        const response = await ai.models.generateContent({
+          model: model || 'gemini-2.0-flash',
+          contents: 'Test',
+        });
+        const now = new Date();
+        const timestamp = now.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
+        console.log(`[DEBUG] [${timestamp}] Gemini request sent`);
+        return !!response.text;
+      } catch (error) {
+        console.error('Gemini validation error:', error.message);
+        return false;
+      }
+    } else {
+      return true;
+    }
+  }
+
   async validateConfig(config) {
     // Validate Paperless config
     const paperlessApiUrl = config.PAPERLESS_API_URL.replace(/\/api/g, '');
@@ -199,6 +221,14 @@ class SetupService {
       );
       if (!azureValid) {
         throw new Error('Invalid Azure configuration');
+      }
+    } else if (aiProvider === 'gemini') {
+      const geminiValid = await this.validateGeminiConfig(
+        config.GEMINI_API_KEY,
+        config.GEMINI_MODEL
+      );
+      if (!geminiValid) {
+        throw new Error('Invalid Gemini configuration');
       }
     }
 

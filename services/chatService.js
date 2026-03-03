@@ -194,9 +194,41 @@ class ChatService {
           messages: chatData.messages,
           stream: true,
         });
-        
+
         for await (const chunk of stream) {
           const content = chunk.choices[0]?.delta?.content || '';
+          if (content) {
+            fullResponse += content;
+            res.write(`data: ${JSON.stringify({ content })}\n\n`);
+          }
+        }
+      } else if (aiProvider === 'gemini') {
+        const { GoogleGenAI } = require('@google/genai');
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+        // Extract system message and build history for Gemini
+        const systemMessage = chatData.messages.find(m => m.role === 'system');
+        const historyMessages = chatData.messages.filter(m => m.role !== 'system' && m !== chatData.messages[chatData.messages.length - 1]);
+
+        const geminiHistory = historyMessages.map(m => ({
+          role: m.role === 'assistant' ? 'model' : m.role,
+          parts: [{ text: m.content }]
+        }));
+
+        const chat = ai.chats.create({
+          model: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
+          history: geminiHistory,
+          config: {
+            systemInstruction: systemMessage ? systemMessage.content : undefined,
+          },
+        });
+
+        const stream = await chat.sendMessageStream({
+          message: userMessage,
+        });
+
+        for await (const chunk of stream) {
+          const content = chunk.text || '';
           if (content) {
             fullResponse += content;
             res.write(`data: ${JSON.stringify({ content })}\n\n`);

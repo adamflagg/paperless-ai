@@ -5,6 +5,7 @@ const paperlessService = require('../services/paperlessService.js');
 const openaiService = require('../services/openaiService.js');
 const ollamaService = require('../services/ollamaService.js');
 const azureService = require('../services/azureService.js');
+const geminiService = require('../services/geminiService.js');
 const documentModel = require('../models/document.js');
 const AIServiceFactory = require('../services/aiServiceFactory');
 const debugService = require('../services/debugService.js');
@@ -1903,7 +1904,9 @@ router.get('/setup', async (req, res) => {
       AZURE_ENDPOINT: process.env.AZURE_ENDPOINT|| '',
       AZURE_API_KEY: process.env.AZURE_API_KEY || '',
       AZURE_DEPLOYMENT_NAME: process.env.AZURE_DEPLOYMENT_NAME || '',
-      AZURE_API_VERSION: process.env.AZURE_API_VERSION || ''
+      AZURE_API_VERSION: process.env.AZURE_API_VERSION || '',
+      GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
+      GEMINI_MODEL: process.env.GEMINI_MODEL || 'gemini-2.0-flash'
     };
 
     // Check both configuration and users
@@ -2704,6 +2707,8 @@ router.get('/settings', async (req, res) => {
     AZURE_API_KEY: process.env.AZURE_API_KEY || '',
     AZURE_DEPLOYMENT_NAME: process.env.AZURE_DEPLOYMENT_NAME || '',
     AZURE_API_VERSION: process.env.AZURE_API_VERSION || '',
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
+    GEMINI_MODEL: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
     RESTRICT_TO_EXISTING_TAGS: process.env.RESTRICT_TO_EXISTING_TAGS || 'no',
     RESTRICT_TO_EXISTING_CORRESPONDENTS: process.env.RESTRICT_TO_EXISTING_CORRESPONDENTS || 'no',
     RESTRICT_TO_EXISTING_DOCUMENT_TYPES: process.env.RESTRICT_TO_EXISTING_DOCUMENT_TYPES || 'no',
@@ -3056,6 +3061,15 @@ router.post('/manual/analyze', express.json(), async (req, res) => {
     } else if (process.env.AI_PROVIDER === 'azure') {
       const analyzeDocument = await azureService.analyzeDocument(content, existingTagsList, existingCorrespondentList, existingDocumentTypesList, id || []);
       return res.json(analyzeDocument);
+    } else if (process.env.AI_PROVIDER === 'gemini') {
+      const analyzeDocument = await geminiService.analyzeDocument(content, existingTagsList, existingCorrespondentList, existingDocumentTypesList, id || []);
+      await documentModel.addOpenAIMetrics(
+        id,
+        analyzeDocument.metrics.promptTokens,
+        analyzeDocument.metrics.completionTokens,
+        analyzeDocument.metrics.totalTokens
+      )
+      return res.json(analyzeDocument);
     } else {
       return res.status(500).json({ error: 'AI provider not configured' });
     }
@@ -3174,7 +3188,16 @@ router.post('/manual/playground', express.json(), async (req, res) => {
     } else if (process.env.AI_PROVIDER === 'azure') {
       const analyzeDocument = await azureService.analyzePlayground(content, prompt);
       await documentModel.addOpenAIMetrics(
-        documentId, 
+        documentId,
+        analyzeDocument.metrics.promptTokens,
+        analyzeDocument.metrics.completionTokens,
+        analyzeDocument.metrics.totalTokens
+      )
+      return res.json(analyzeDocument);
+    } else if (process.env.AI_PROVIDER === 'gemini') {
+      const analyzeDocument = await geminiService.analyzePlayground(content, prompt);
+      await documentModel.addOpenAIMetrics(
+        documentId,
         analyzeDocument.metrics.promptTokens,
         analyzeDocument.metrics.completionTokens,
         analyzeDocument.metrics.totalTokens
@@ -3443,7 +3466,7 @@ router.get('/health', async (req, res) => {
  *               aiProvider:
  *                 type: string
  *                 description: Selected AI provider for document analysis
- *                 enum: ["openai", "ollama", "custom", "azure"]
+ *                 enum: ["openai", "ollama", "custom", "azure", "gemini"]
  *                 example: "openai"
  *               openaiKey:
  *                 type: string
@@ -3618,11 +3641,13 @@ router.post('/setup', express.json(), async (req, res) => {
       azureEndpoint,
       azureApiKey,
       azureDeploymentName,
-      azureApiVersion
+      azureApiVersion,
+      geminiApiKey,
+      geminiModel
     } = req.body;
 
     // Log setup request with sensitive data redacted
-    const sensitiveKeys = ['paperlessToken', 'openaiKey', 'customApiKey', 'password', 'confirmPassword'];
+    const sensitiveKeys = ['paperlessToken', 'openaiKey', 'customApiKey', 'password', 'confirmPassword', 'geminiApiKey'];
     const redactedBody = Object.fromEntries(
       Object.entries(req.body).map(([key, value]) => [
       key,
@@ -3740,9 +3765,11 @@ router.post('/setup', express.json(), async (req, res) => {
       AZURE_ENDPOINT: azureEndpoint || '',
       AZURE_API_KEY: azureApiKey || '',
       AZURE_DEPLOYMENT_NAME: azureDeploymentName || '',
-      AZURE_API_VERSION: azureApiVersion || ''
+      AZURE_API_VERSION: azureApiVersion || '',
+      GEMINI_API_KEY: geminiApiKey || '',
+      GEMINI_MODEL: geminiModel || 'gemini-2.0-flash'
     };
-    
+
     // Validate AI provider config
     if (aiProvider === 'openai') {
       const isOpenAIValid = await setupService.validateOpenAIConfig(openaiKey);
@@ -3777,6 +3804,13 @@ router.post('/setup', express.json(), async (req, res) => {
       if (!isAzureValid) {
         return res.status(400).json({
           error: 'Azure connection failed. Please check URL, API Key, Deployment Name and API Version.'
+        });
+      }
+    } else if (aiProvider === 'gemini') {
+      const isGeminiValid = await setupService.validateGeminiConfig(geminiApiKey, geminiModel);
+      if (!isGeminiValid) {
+        return res.status(400).json({
+          error: 'Gemini connection failed. Please check API Key and Model.'
         });
       }
     }
@@ -3844,7 +3878,7 @@ router.post('/setup', express.json(), async (req, res) => {
  *               aiProvider:
  *                 type: string
  *                 description: Selected AI provider for document analysis
- *                 enum: ["openai", "ollama", "custom", "azure"]
+ *                 enum: ["openai", "ollama", "custom", "azure", "gemini"]
  *                 example: "openai"
  *               openaiKey:
  *                 type: string
@@ -4025,7 +4059,9 @@ router.post('/settings', express.json(), async (req, res) => {
       azureEndpoint,
       azureApiKey,
       azureDeploymentName,
-      azureApiVersion
+      azureApiVersion,
+      geminiApiKey,
+      geminiModel
     } = req.body;
 
     //replace equal char in system prompt
@@ -4069,6 +4105,8 @@ router.post('/settings', express.json(), async (req, res) => {
       AZURE_API_KEY: process.env.AZURE_API_KEY || '',
       AZURE_DEPLOYMENT_NAME: process.env.AZURE_DEPLOYMENT_NAME || '',
       AZURE_API_VERSION: process.env.AZURE_API_VERSION || '',
+      GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
+      GEMINI_MODEL: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
       RESTRICT_TO_EXISTING_TAGS: process.env.RESTRICT_TO_EXISTING_TAGS || 'no',
       RESTRICT_TO_EXISTING_CORRESPONDENTS: process.env.RESTRICT_TO_EXISTING_CORRESPONDENTS || 'no',
       RESTRICT_TO_EXISTING_DOCUMENT_TYPES: process.env.RESTRICT_TO_EXISTING_DOCUMENT_TYPES || 'no',
@@ -4182,6 +4220,18 @@ router.post('/settings', express.json(), async (req, res) => {
         if(azureApiKey) updatedConfig.AZURE_API_KEY = azureApiKey;
         if(azureDeploymentName) updatedConfig.AZURE_DEPLOYMENT_NAME = azureDeploymentName;
         if(azureApiVersion) updatedConfig.AZURE_API_VERSION = azureApiVersion;
+      } else if (aiProvider === 'gemini') {
+        const isGeminiValid = await setupService.validateGeminiConfig(
+          geminiApiKey || currentConfig.GEMINI_API_KEY,
+          geminiModel || currentConfig.GEMINI_MODEL
+        );
+        if (!isGeminiValid) {
+          return res.status(400).json({
+            error: 'Gemini connection failed. Please check API Key and Model.'
+          });
+        }
+        if(geminiApiKey) updatedConfig.GEMINI_API_KEY = geminiApiKey;
+        if(geminiModel) updatedConfig.GEMINI_MODEL = geminiModel;
       }
     }
 
