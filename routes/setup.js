@@ -18,7 +18,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const { JWT_SECRET } = require('./auth');
 const customService = require('../services/customService.js');
 const config = require('../config/config.js');
 require('dotenv').config({ path: '../data/.env' });

@@ -49,4 +49,4 @@ const isAuthenticated = (req, res, next) => {
   }
 };
 
-module.exports = { authenticateJWT, isAuthenticated };
+module.exports = { authenticateJWT, isAuthenticated, JWT_SECRET };
