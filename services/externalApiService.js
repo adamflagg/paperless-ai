@@ -23,7 +23,7 @@ class ExternalApiService {
         headers = {},
         body = {},
         timeout = 5000,
-        transform
+        transform,
       } = config.externalApiConfig;
 
       if (!url) {

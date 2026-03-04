@@ -16,7 +16,7 @@ class SetupService {
     try {
       const envContent = await fs.readFile(this.envPath, 'utf8');
       const config = {};
-      envContent.split('\n').forEach(line => {
+      envContent.split('\n').forEach((line) => {
         const [key, value] = line.split('=');
         if (key && value) {
           config[key.trim()] = value.trim();
@@ -34,8 +34,8 @@ class SetupService {
       console.log('Validating Paperless config for:', url + '/api/documents/');
       const response = await axios.get(`${url}/api/documents/`, {
         headers: {
-          'Authorization': `Token ${token}`
-        }
+          Authorization: `Token ${token}`,
+        },
       });
       return response.status === 200;
     } catch (error) {
@@ -45,35 +45,47 @@ class SetupService {
   }
 
   async validateApiPermissions(url, token) {
-    for (const endpoint of ['correspondents', 'tags', 'documents', 'document_types', 'custom_fields', 'users']) {
+    for (const endpoint of [
+      'correspondents',
+      'tags',
+      'documents',
+      'document_types',
+      'custom_fields',
+      'users',
+    ]) {
       try {
         console.log(`Validating API permissions for ${url}/api/${endpoint}/`);
         const response = await axios.get(`${url}/api/${endpoint}/`, {
           headers: {
-            'Authorization': `Token ${token}`
-          }
+            Authorization: `Token ${token}`,
+          },
         });
         console.log(`API permissions validated for ${endpoint}, ${response.status}`);
         if (response.status !== 200) {
           console.error(`API permissions validation failed for ${endpoint}`);
-          return { success: false, message: `API permissions validation failed for endpoint '/api/${endpoint}/'` };
+          return {
+            success: false,
+            message: `API permissions validation failed for endpoint '/api/${endpoint}/'`,
+          };
         }
       } catch (error) {
         console.error(`API permissions validation failed for ${endpoint}:`, error.message);
-        return { success: false, message: `API permissions validation failed for endpoint '/api/${endpoint}/'` };
+        return {
+          success: false,
+          message: `API permissions validation failed for endpoint '/api/${endpoint}/'`,
+        };
       }
     }
     return { success: true, message: 'API permissions validated successfully' };
-}
-
+  }
 
   async validateOpenAIConfig(apiKey) {
     if (config.CONFIGURED === false) {
       try {
         const openai = new OpenAI({ apiKey });
         const response = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
-          messages: [{ role: "user", content: "Test" }],
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'user', content: 'Test' }],
         });
         const now = new Date();
         const timestamp = now.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
@@ -83,7 +95,7 @@ class SetupService {
         console.error('OpenAI validation error:', error.message);
         return false;
       }
-    }else{
+    } else {
       return true;
     }
   }
@@ -92,16 +104,16 @@ class SetupService {
     const config = {
       baseURL: url,
       apiKey: apiKey,
-      model: model
+      model: model,
     };
     console.log('Custom AI config:', config);
     try {
-      const openai = new OpenAI({ 
-        apiKey: config.apiKey, 
+      const openai = new OpenAI({
+        apiKey: config.apiKey,
         baseURL: config.baseURL,
       });
       const completion = await openai.chat.completions.create({
-        messages: [{ role: "user", content: "Test" }],
+        messages: [{ role: 'user', content: 'Test' }],
         model: config.model,
       });
       return completion.choices && completion.choices.length > 0;
@@ -111,14 +123,12 @@ class SetupService {
     }
   }
 
-
-
   async validateOllamaConfig(url, model) {
     try {
       const response = await axios.post(`${url}/api/generate`, {
         model: model || 'llama3.2',
         prompt: 'Test',
-        stream: false
+        stream: false,
       });
       return response.data && response.data.response;
     } catch (error) {
@@ -131,13 +141,15 @@ class SetupService {
     console.log('Endpoint: ', endpoint);
     if (config.CONFIGURED === false) {
       try {
-        const openai = new AzureOpenAI({ apiKey: apiKey,
-                endpoint: endpoint,
-                deploymentName: deploymentName,
-                apiVersion: apiVersion });
+        const openai = new AzureOpenAI({
+          apiKey: apiKey,
+          endpoint: endpoint,
+          deploymentName: deploymentName,
+          apiVersion: apiVersion,
+        });
         const response = await openai.chat.completions.create({
           model: deploymentName,
-          messages: [{ role: "user", content: "Test" }],
+          messages: [{ role: 'user', content: 'Test' }],
         });
         const now = new Date();
         const timestamp = now.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
@@ -147,7 +159,7 @@ class SetupService {
         console.error('OpenAI validation error:', error.message);
         return false;
       }
-    }else{
+    } else {
       return true;
     }
   }
@@ -180,7 +192,7 @@ class SetupService {
       paperlessApiUrl,
       config.PAPERLESS_API_TOKEN
     );
-    
+
     if (!paperlessValid) {
       throw new Error('Invalid Paperless configuration');
     }
@@ -189,7 +201,7 @@ class SetupService {
     const aiProvider = config.AI_PROVIDER || 'openai';
 
     console.log('AI provider:', aiProvider);
-    
+
     if (aiProvider === 'openai') {
       const openaiValid = await this.validateOpenAIConfig(config.OPENAI_API_KEY);
       if (!openaiValid) {
@@ -232,7 +244,6 @@ class SetupService {
       }
     }
 
-
     return true;
   }
 
@@ -258,7 +269,7 @@ class SetupService {
 
       const envContent = Object.entries(config)
         .map(([key, value]) => {
-          if (key === "SYSTEM_PROMPT") {
+          if (key === 'SYSTEM_PROMPT') {
             return `${key}=\`${value}\n\``;
           }
           return `${key}=${value}`;
@@ -266,7 +277,7 @@ class SetupService {
         .join('\n');
 
       await fs.writeFile(this.envPath, envContent);
-      
+
       // Reload environment variables
       Object.entries(config).forEach(([key, value]) => {
         process.env[key] = value;
@@ -349,7 +360,7 @@ class SetupService {
           return false;
         }
         console.log(`Retrying configuration (attempt ${attempts}/${maxAttempts}) in 5 seconds...`);
-        await new Promise(resolve => setTimeout(resolve, delayBetweenAttempts));
+        await new Promise((resolve) => setTimeout(resolve, delayBetweenAttempts));
       }
     }
 

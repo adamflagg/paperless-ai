@@ -8,7 +8,7 @@ const existingTags = [
   { name: 'invoice' },
   { name: 'receipt' },
   { name: 'contract' },
-  { name: 'urgent' }
+  { name: 'urgent' },
 ];
 
 const existingCorrespondents = ['John Doe', 'ACME Corp', 'Tax Office'];
@@ -16,7 +16,7 @@ const existingCorrespondents = ['John Doe', 'ACME Corp', 'Tax Office'];
 const config = {
   useExistingData: 'yes',
   restrictToExistingTags: 'yes',
-  restrictToExistingCorrespondents: 'yes'
+  restrictToExistingCorrespondents: 'yes',
 };
 
 console.log('=== Restriction Prompt Service Test ===\n');

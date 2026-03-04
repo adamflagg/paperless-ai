@@ -52,8 +52,8 @@ class RestrictionPromptService {
     }
 
     return existingTags
-      .filter(tag => tag && tag.name)
-      .map(tag => tag.name)
+      .filter((tag) => tag && tag.name)
+      .map((tag) => tag.name)
       .join(', ');
   }
 
@@ -73,12 +73,12 @@ class RestrictionPromptService {
 
     if (Array.isArray(existingCorrespondentList)) {
       return existingCorrespondentList
-        .filter(Boolean)  // Remove any null/undefined entries
-        .map(correspondent => {
+        .filter(Boolean) // Remove any null/undefined entries
+        .map((correspondent) => {
           if (typeof correspondent === 'string') return correspondent;
           return correspondent?.name || '';
         })
-        .filter(name => name.length > 0)  // Remove empty strings
+        .filter((name) => name.length > 0) // Remove empty strings
         .join(', ');
     }
 

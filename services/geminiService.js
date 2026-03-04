@@ -1,7 +1,7 @@
 const {
   calculateTokens,
   calculateTotalPromptTokens,
-  truncateToTokenLimit
+  truncateToTokenLimit,
 } = require('./serviceUtils');
 const { GoogleGenAI } = require('@google/genai');
 const config = require('../config/config');
@@ -21,7 +21,15 @@ class GeminiService {
     }
   }
 
-  async analyzeDocument(content, existingTags = [], existingCorrespondentList = [], existingDocumentTypesList = [], id, customPrompt = null, options = {}) {
+  async analyzeDocument(
+    content,
+    existingTags = [],
+    existingCorrespondentList = [],
+    existingDocumentTypesList = [],
+    id,
+    customPrompt = null,
+    options = {}
+  ) {
     const cachePath = path.join('./public/images', `${id}.png`);
     try {
       this.initialize();
@@ -58,7 +66,8 @@ class GeminiService {
 
       if (externalApiData) {
         try {
-          validatedExternalApiData = await this._validateAndTruncateExternalApiData(externalApiData);
+          validatedExternalApiData =
+            await this._validateAndTruncateExternalApiData(externalApiData);
           console.log('[DEBUG] External API data validated and included');
         } catch (error) {
           console.warn('[WARNING] External API data validation failed:', error.message);
@@ -85,23 +94,33 @@ class GeminiService {
       customFieldsObj.custom_fields.forEach((field, index) => {
         customFieldsTemplate[index] = {
           field_name: field.value,
-          value: "Fill in the value based on your analysis"
+          value: 'Fill in the value based on your analysis',
         };
       });
 
       // Convert template to string for replacement and wrap in custom_fields
-      const customFieldsStr = '"custom_fields": ' + JSON.stringify(customFieldsTemplate, null, 2)
-        .split('\n')
-        .map(line => '    ' + line)
-        .join('\n');
+      const customFieldsStr =
+        '"custom_fields": ' +
+        JSON.stringify(customFieldsTemplate, null, 2)
+          .split('\n')
+          .map((line) => '    ' + line)
+          .join('\n');
 
       // Get system prompt based on configuration
-      if (config.useExistingData === 'yes' && config.restrictToExistingTags === 'no' && config.restrictToExistingCorrespondents === 'no') {
-        systemPrompt = `
+      if (
+        config.useExistingData === 'yes' &&
+        config.restrictToExistingTags === 'no' &&
+        config.restrictToExistingCorrespondents === 'no'
+      ) {
+        systemPrompt =
+          `
         Pre-existing tags: ${existingTagsList}\n\n
         Pre-existing correspondents: ${existingCorrespondentList}\n\n
         Pre-existing document types: ${existingDocumentTypesList.join(', ')}\n\n
-        ` + process.env.SYSTEM_PROMPT + '\n\n' + config.mustHavePrompt.replace('%CUSTOMFIELDS%', customFieldsStr);
+        ` +
+          process.env.SYSTEM_PROMPT +
+          '\n\n' +
+          config.mustHavePrompt.replace('%CUSTOMFIELDS%', customFieldsStr);
         promptTags = '';
       } else {
         config.mustHavePrompt = config.mustHavePrompt.replace('%CUSTOMFIELDS%', customFieldsStr);
@@ -125,7 +144,8 @@ class GeminiService {
 
       if (process.env.USE_PROMPT_TAGS === 'yes') {
         promptTags = process.env.PROMPT_TAGS;
-        systemPrompt = `
+        systemPrompt =
+          `
         Take these tags and try to match one or more to the document content.\n\n
         ` + config.specialPromptPreDefinedTags;
       }
@@ -149,12 +169,18 @@ class GeminiService {
 
       // Validate that we have positive available tokens
       if (availableTokens <= 0) {
-        console.warn(`[WARNING] No available tokens for content. Reserved: ${reservedTokens}, Max: ${maxTokens}`);
+        console.warn(
+          `[WARNING] No available tokens for content. Reserved: ${reservedTokens}, Max: ${maxTokens}`
+        );
         throw new Error('Token limit exceeded: prompt too large for available token limit');
       }
 
-      console.log(`[DEBUG] Token calculation - Prompt: ${totalPromptTokens}, Reserved: ${reservedTokens}, Available: ${availableTokens}`);
-      console.log(`[DEBUG] Use existing data: ${config.useExistingData}, Restrictions applied based on useExistingData setting`);
+      console.log(
+        `[DEBUG] Token calculation - Prompt: ${totalPromptTokens}, Reserved: ${reservedTokens}, Available: ${availableTokens}`
+      );
+      console.log(
+        `[DEBUG] Use existing data: ${config.useExistingData}, Restrictions applied based on useExistingData setting`
+      );
       console.log(`[DEBUG] External API data: ${validatedExternalApiData ? 'included' : 'none'}`);
 
       const truncatedContent = await truncateToTokenLimit(content, availableTokens, model);
@@ -170,7 +196,9 @@ class GeminiService {
 
       // Check for safety filter blocks
       if (!response.text) {
-        throw new Error('Gemini returned empty response - content may have been blocked by safety filters');
+        throw new Error(
+          'Gemini returned empty response - content may have been blocked by safety filters'
+        );
       }
 
       // Log token usage
@@ -180,13 +208,16 @@ class GeminiService {
       const mappedUsage = {
         promptTokens: usage.promptTokenCount || 0,
         completionTokens: usage.candidatesTokenCount || 0,
-        totalTokens: usage.totalTokenCount || 0
+        totalTokens: usage.totalTokenCount || 0,
       };
 
       console.log(`[DEBUG] [${timestamp}] Total tokens: ${mappedUsage.totalTokens}`);
 
       let jsonContent = response.text;
-      jsonContent = jsonContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      jsonContent = jsonContent
+        .replace(/```json\n?/g, '')
+        .replace(/```\n?/g, '')
+        .trim();
 
       let parsedResponse;
       try {
@@ -200,21 +231,25 @@ class GeminiService {
       }
 
       // Validate response structure
-      if (!parsedResponse || !Array.isArray(parsedResponse.tags) || typeof parsedResponse.correspondent !== 'string') {
+      if (
+        !parsedResponse ||
+        !Array.isArray(parsedResponse.tags) ||
+        typeof parsedResponse.correspondent !== 'string'
+      ) {
         throw new Error('Invalid response structure: missing tags array or correspondent string');
       }
 
       return {
         document: parsedResponse,
         metrics: mappedUsage,
-        truncated: truncatedContent.length < content.length
+        truncated: truncatedContent.length < content.length,
       };
     } catch (error) {
       console.error('Failed to analyze document:', error);
       return {
         document: { tags: [], correspondent: null },
         metrics: null,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -230,15 +265,16 @@ class GeminiService {
       return null;
     }
 
-    const dataString = typeof apiData === 'object'
-      ? JSON.stringify(apiData, null, 2)
-      : String(apiData);
+    const dataString =
+      typeof apiData === 'object' ? JSON.stringify(apiData, null, 2) : String(apiData);
 
     // Calculate tokens for the data
     const dataTokens = await calculateTokens(dataString, config.gemini.model);
 
     if (dataTokens > maxTokens) {
-      console.warn(`[WARNING] External API data (${dataTokens} tokens) exceeds limit (${maxTokens}), truncating`);
+      console.warn(
+        `[WARNING] External API data (${dataTokens} tokens) exceeds limit (${maxTokens}), truncating`
+      );
       return await truncateToTokenLimit(dataString, maxTokens, config.gemini.model);
     }
 
@@ -267,9 +303,7 @@ class GeminiService {
       }
 
       // Calculate total prompt tokens including musthavePrompt
-      const totalPromptTokens = await calculateTotalPromptTokens(
-        prompt + musthavePrompt
-      );
+      const totalPromptTokens = await calculateTotalPromptTokens(prompt + musthavePrompt);
 
       // Calculate available tokens
       const maxTokens = Number(config.tokenLimit);
@@ -290,7 +324,9 @@ class GeminiService {
 
       // Check for safety filter blocks
       if (!response.text) {
-        throw new Error('Gemini returned empty response - content may have been blocked by safety filters');
+        throw new Error(
+          'Gemini returned empty response - content may have been blocked by safety filters'
+        );
       }
 
       // Log token usage
@@ -300,13 +336,16 @@ class GeminiService {
       const mappedUsage = {
         promptTokens: usage.promptTokenCount || 0,
         completionTokens: usage.candidatesTokenCount || 0,
-        totalTokens: usage.totalTokenCount || 0
+        totalTokens: usage.totalTokenCount || 0,
       };
 
       console.log(`[DEBUG] [${timestamp}] Total tokens: ${mappedUsage.totalTokens}`);
 
       let jsonContent = response.text;
-      jsonContent = jsonContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      jsonContent = jsonContent
+        .replace(/```json\n?/g, '')
+        .replace(/```\n?/g, '')
+        .trim();
 
       let parsedResponse;
       try {
@@ -317,21 +356,25 @@ class GeminiService {
       }
 
       // Validate response structure
-      if (!parsedResponse || !Array.isArray(parsedResponse.tags) || typeof parsedResponse.correspondent !== 'string') {
+      if (
+        !parsedResponse ||
+        !Array.isArray(parsedResponse.tags) ||
+        typeof parsedResponse.correspondent !== 'string'
+      ) {
         throw new Error('Invalid response structure: missing tags array or correspondent string');
       }
 
       return {
         document: parsedResponse,
         metrics: mappedUsage,
-        truncated: truncatedContent.length < content.length
+        truncated: truncatedContent.length < content.length,
       };
     } catch (error) {
       console.error('Failed to analyze document:', error);
       return {
         document: { tags: [], correspondent: null },
         metrics: null,
-        error: error.message
+        error: error.message,
       };
     }
   }

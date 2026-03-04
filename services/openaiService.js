@@ -2,7 +2,7 @@ const {
   calculateTokens,
   calculateTotalPromptTokens,
   truncateToTokenLimit,
-  writePromptToFile
+  writePromptToFile,
 } = require('./serviceUtils');
 const OpenAI = require('openai');
 const config = require('../config/config');
@@ -21,23 +21,31 @@ class OpenAIService {
     if (!this.client && config.aiProvider === 'ollama') {
       this.client = new OpenAI({
         baseURL: config.ollama.apiUrl + '/v1',
-        apiKey: 'ollama'
+        apiKey: 'ollama',
       });
     } else if (!this.client && config.aiProvider === 'custom') {
       this.client = new OpenAI({
         baseURL: config.custom.apiUrl,
-        apiKey: config.custom.apiKey
+        apiKey: config.custom.apiKey,
       });
     } else if (!this.client && config.aiProvider === 'openai') {
       if (!this.client && config.openai.apiKey) {
         this.client = new OpenAI({
-          apiKey: config.openai.apiKey
+          apiKey: config.openai.apiKey,
         });
       }
     }
   }
 
-  async analyzeDocument(content, existingTags = [], existingCorrespondentList = [], existingDocumentTypesList = [], id, customPrompt = null, options = {}) {
+  async analyzeDocument(
+    content,
+    existingTags = [],
+    existingCorrespondentList = [],
+    existingDocumentTypesList = [],
+    id,
+    customPrompt = null,
+    options = {}
+  ) {
     const cachePath = path.join('./public/images', `${id}.png`);
     try {
       this.initialize();
@@ -74,7 +82,8 @@ class OpenAIService {
 
       if (externalApiData) {
         try {
-          validatedExternalApiData = await this._validateAndTruncateExternalApiData(externalApiData);
+          validatedExternalApiData =
+            await this._validateAndTruncateExternalApiData(externalApiData);
           console.log('[DEBUG] External API data validated and included');
         } catch (error) {
           console.warn('[WARNING] External API data validation failed:', error.message);
@@ -101,23 +110,33 @@ class OpenAIService {
       customFieldsObj.custom_fields.forEach((field, index) => {
         customFieldsTemplate[index] = {
           field_name: field.value,
-          value: "Fill in the value based on your analysis"
+          value: 'Fill in the value based on your analysis',
         };
       });
 
       // Convert template to string for replacement and wrap in custom_fields
-      const customFieldsStr = '"custom_fields": ' + JSON.stringify(customFieldsTemplate, null, 2)
-        .split('\n')
-        .map(line => '    ' + line)  // Add proper indentation
-        .join('\n');
+      const customFieldsStr =
+        '"custom_fields": ' +
+        JSON.stringify(customFieldsTemplate, null, 2)
+          .split('\n')
+          .map((line) => '    ' + line) // Add proper indentation
+          .join('\n');
 
       // Get system prompt and model
-      if (config.useExistingData === 'yes' && config.restrictToExistingTags === 'no' && config.restrictToExistingCorrespondents === 'no') {
-        systemPrompt = `
+      if (
+        config.useExistingData === 'yes' &&
+        config.restrictToExistingTags === 'no' &&
+        config.restrictToExistingCorrespondents === 'no'
+      ) {
+        systemPrompt =
+          `
         Pre-existing tags: ${existingTagsList}\n\n
         Pre-existing correspondents: ${existingCorrespondentList}\n\n
         Pre-existing document types: ${existingDocumentTypesList.join(', ')}\n\n
-        ` + process.env.SYSTEM_PROMPT + '\n\n' + config.mustHavePrompt.replace('%CUSTOMFIELDS%', customFieldsStr);
+        ` +
+          process.env.SYSTEM_PROMPT +
+          '\n\n' +
+          config.mustHavePrompt.replace('%CUSTOMFIELDS%', customFieldsStr);
         promptTags = '';
       } else {
         config.mustHavePrompt = config.mustHavePrompt.replace('%CUSTOMFIELDS%', customFieldsStr);
@@ -140,7 +159,8 @@ class OpenAIService {
 
       if (process.env.USE_PROMPT_TAGS === 'yes') {
         promptTags = process.env.PROMPT_TAGS;
-        systemPrompt = `
+        systemPrompt =
+          `
         Take these tags and try to match one or more to the document content.\n\n
         ` + config.specialPromptPreDefinedTags;
       }
@@ -163,12 +183,18 @@ class OpenAIService {
 
       // Validate that we have positive available tokens
       if (availableTokens <= 0) {
-        console.warn(`[WARNING] No available tokens for content. Reserved: ${reservedTokens}, Max: ${maxTokens}`);
+        console.warn(
+          `[WARNING] No available tokens for content. Reserved: ${reservedTokens}, Max: ${maxTokens}`
+        );
         throw new Error('Token limit exceeded: prompt too large for available token limit');
       }
 
-      console.log(`[DEBUG] Token calculation - Prompt: ${totalPromptTokens}, Reserved: ${reservedTokens}, Available: ${availableTokens}`);
-      console.log(`[DEBUG] Use existing data: ${config.useExistingData}, Restrictions applied based on useExistingData setting`);
+      console.log(
+        `[DEBUG] Token calculation - Prompt: ${totalPromptTokens}, Reserved: ${reservedTokens}, Available: ${availableTokens}`
+      );
+      console.log(
+        `[DEBUG] Use existing data: ${config.useExistingData}, Restrictions applied based on useExistingData setting`
+      );
       console.log(`[DEBUG] External API data: ${validatedExternalApiData ? 'included' : 'none'}`);
 
       const truncatedContent = await truncateToTokenLimit(content, availableTokens, model);
@@ -179,13 +205,13 @@ class OpenAIService {
         model: model,
         messages: [
           {
-            role: "system",
-            content: systemPrompt
+            role: 'system',
+            content: systemPrompt,
           },
           {
-            role: "user",
-            content: truncatedContent
-          }
+            role: 'user',
+            content: truncatedContent,
+          },
         ],
         ...(model !== 'o3-mini' && { temperature: 0.3 }),
       });
@@ -201,11 +227,14 @@ class OpenAIService {
       const mappedUsage = {
         promptTokens: usage.prompt_tokens,
         completionTokens: usage.completion_tokens,
-        totalTokens: usage.total_tokens
+        totalTokens: usage.total_tokens,
       };
 
       let jsonContent = response.choices[0].message.content;
-      jsonContent = jsonContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      jsonContent = jsonContent
+        .replace(/```json\n?/g, '')
+        .replace(/```\n?/g, '')
+        .trim();
 
       let parsedResponse;
       try {
@@ -219,21 +248,25 @@ class OpenAIService {
         throw new Error('Invalid JSON response from API');
       }
 
-      if (!parsedResponse || !Array.isArray(parsedResponse.tags) || typeof parsedResponse.correspondent !== 'string') {
+      if (
+        !parsedResponse ||
+        !Array.isArray(parsedResponse.tags) ||
+        typeof parsedResponse.correspondent !== 'string'
+      ) {
         throw new Error('Invalid response structure: missing tags array or correspondent string');
       }
 
       return {
         document: parsedResponse,
         metrics: mappedUsage,
-        truncated: truncatedContent.length < content.length
+        truncated: truncatedContent.length < content.length,
       };
     } catch (error) {
       console.error('Failed to analyze document:', error);
       return {
         document: { tags: [], correspondent: null },
         metrics: null,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -249,15 +282,16 @@ class OpenAIService {
       return null;
     }
 
-    const dataString = typeof apiData === 'object'
-      ? JSON.stringify(apiData, null, 2)
-      : String(apiData);
+    const dataString =
+      typeof apiData === 'object' ? JSON.stringify(apiData, null, 2) : String(apiData);
 
     // Calculate tokens for the data
     const dataTokens = await calculateTokens(dataString, process.env.OPENAI_MODEL);
 
     if (dataTokens > maxTokens) {
-      console.warn(`[WARNING] External API data (${dataTokens} tokens) exceeds limit (${maxTokens}), truncating`);
+      console.warn(
+        `[WARNING] External API data (${dataTokens} tokens) exceeds limit (${maxTokens}), truncating`
+      );
       return await truncateToTokenLimit(dataString, maxTokens, process.env.OPENAI_MODEL);
     }
 
@@ -303,13 +337,13 @@ class OpenAIService {
         model: model,
         messages: [
           {
-            role: "system",
-            content: prompt + musthavePrompt
+            role: 'system',
+            content: prompt + musthavePrompt,
           },
           {
-            role: "user",
-            content: truncatedContent
-          }
+            role: 'user',
+            content: truncatedContent,
+          },
         ],
         ...(model !== 'o3-mini' && { temperature: 0.3 }),
       });
@@ -327,11 +361,14 @@ class OpenAIService {
       const mappedUsage = {
         promptTokens: usage.prompt_tokens,
         completionTokens: usage.completion_tokens,
-        totalTokens: usage.total_tokens
+        totalTokens: usage.total_tokens,
       };
 
       let jsonContent = response.choices[0].message.content;
-      jsonContent = jsonContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      jsonContent = jsonContent
+        .replace(/```json\n?/g, '')
+        .replace(/```\n?/g, '')
+        .trim();
 
       let parsedResponse;
       try {
@@ -342,21 +379,25 @@ class OpenAIService {
       }
 
       // Validate response structure
-      if (!parsedResponse || !Array.isArray(parsedResponse.tags) || typeof parsedResponse.correspondent !== 'string') {
+      if (
+        !parsedResponse ||
+        !Array.isArray(parsedResponse.tags) ||
+        typeof parsedResponse.correspondent !== 'string'
+      ) {
         throw new Error('Invalid response structure: missing tags array or correspondent string');
       }
 
       return {
         document: parsedResponse,
         metrics: mappedUsage,
-        truncated: truncatedContent.length < content.length
+        truncated: truncatedContent.length < content.length,
       };
     } catch (error) {
       console.error('Failed to analyze document:', error);
       return {
         document: { tags: [], correspondent: null },
         metrics: null,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -380,11 +421,11 @@ class OpenAIService {
         model: model,
         messages: [
           {
-            role: "user",
-            content: prompt
-          }
+            role: 'user',
+            content: prompt,
+          },
         ],
-        temperature: 0.7
+        temperature: 0.7,
       });
 
       if (!response?.choices?.[0]?.message?.content) {
@@ -410,11 +451,11 @@ class OpenAIService {
         model: process.env.OPENAI_MODEL,
         messages: [
           {
-            role: "user",
-            content: "Test"
-          }
+            role: 'user',
+            content: 'Test',
+          },
         ],
-        temperature: 0.7
+        temperature: 0.7,
       });
       if (!response?.choices?.[0]?.message?.content) {
         throw new Error('Invalid API response structure');

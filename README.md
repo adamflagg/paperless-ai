@@ -14,7 +14,7 @@ It enables **fully automated document workflows**, **contextual chat**, and **po
 > 💡 Just ask:  
 > “When did I sign my rental agreement?”  
 > “What was the amount of the last electricity bill?”  
-> “Which documents mention my health insurance?”  
+> “Which documents mention my health insurance?”
 
 Powered by **Retrieval-Augmented Generation (RAG)**, you can now search semantically across your full archive and get precise, natural language answers.
 
@@ -23,6 +23,7 @@ Powered by **Retrieval-Augmented Generation (RAG)**, you can now search semantic
 ## ✨ Features
 
 ### 🔄 Automated Document Processing
+
 - Detects new documents in Paperless-ngx automatically
 - Analyzes content using OpenAI API, Ollama, and other compatible backends
 - Assigns title, tags, document type, and correspondent
@@ -40,22 +41,25 @@ Powered by **Retrieval-Augmented Generation (RAG)**, you can now search semantic
   - ...and more!
 
 ### 🧠 RAG-Based AI Chat
+
 - Natural language document search and Q&A
 - Understands full document context (not just keywords)
 - Semantic memory powered by your own data
 - Fast, intelligent, privacy-friendly document queries  
-![RAG_CHAT_DEMO](https://raw.githubusercontent.com/clusterzx/paperless-ai/refs/heads/main/ppairag.png)
+  ![RAG_CHAT_DEMO](https://raw.githubusercontent.com/clusterzx/paperless-ai/refs/heads/main/ppairag.png)
 
 ### ⚙️ Manual Processing
+
 - Web interface for manual AI tagging
 - Useful when reviewing sensitive documents
 - Accessible via `/manual`
 
 ### 🧩 Smart Tagging & Rules
+
 - Define rules to limit which documents are processed
 - Disable prompts and apply tags automatically
 - Set custom output tags for tracked classification  
-![PPAI_SHOWCASE3](https://github.com/user-attachments/assets/1fc9f470-6e45-43e0-a212-b8fa6225e8dd)
+  ![PPAI_SHOWCASE3](https://github.com/user-attachments/assets/1fc9f470-6e45-43e0-a212-b8fa6225e8dd)
 
 ---
 

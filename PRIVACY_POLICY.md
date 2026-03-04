@@ -13,7 +13,9 @@ Email: clusterz[at]protonmail.com
 ## 3. Data Collection and Processing
 
 ### 3.1 Stored Data
+
 The Extension stores the following data locally in your browser:
+
 - URL of your Paperless-ngx installation
 - URL of your Paperless-AI server
 - API key for the Paperless-AI service
@@ -21,11 +23,13 @@ The Extension stores the following data locally in your browser:
 This data is stored exclusively in the Chrome Storage Sync API and is only accessible by the Extension.
 
 ### 3.2 Document Content Processing
+
 - The Extension only accesses document content when you actively use the chat function for a specific document
 - Document contents are transmitted exclusively to your configured Paperless-AI server
 - No document content is transmitted to third parties
 
 ### 3.3 Chat History
+
 - Chat histories are only temporarily held in browser memory
 - This data is deleted when closing the chat window
 - No permanent storage of chat histories occurs in the Extension
@@ -33,6 +37,7 @@ This data is stored exclusively in the Chrome Storage Sync API and is only acces
 ## 4. Data Transmission
 
 The Extension transmits data exclusively to:
+
 - Your self-hosted Paperless-ngx installation
 - Your self-configured Paperless-AI server
 
@@ -41,6 +46,7 @@ No data is transmitted to the Extension developers or other third parties.
 ## 5. Permissions
 
 The Extension requires the following browser permissions:
+
 - "storage": For saving your configuration settings
 - "activeTab": For integrating chat functionality into the Paperless-ngx interface
 - "host_permissions": For communication with your Paperless-ngx and Paperless-AI servers
@@ -54,11 +60,13 @@ The Extension requires the following browser permissions:
 ## 7. Your Rights
 
 You have the right to:
+
 - Uninstall the Extension at any time
 - Delete your stored settings
 - Cease using the Extension at any time
 
 Under GDPR, you also have the following rights:
+
 - Right to access your personal data
 - Right to rectification
 - Right to erasure ("right to be forgotten")
@@ -82,14 +90,17 @@ By installing and using the Extension, you agree to this privacy policy. You can
 ## 11. Technical Details
 
 ### 11.1 Data Storage Location
+
 All configuration data is stored locally in your browser using Chrome's secure storage APIs. No data is stored on our servers.
 
 ### 11.2 Data Processing
+
 - Document content is processed only when explicitly requested through the chat interface
 - Processing occurs on your configured Paperless-AI server
 - No content caching or storage occurs within the Extension
 
 ### 11.3 Security Measures
+
 - All API communications use HTTPS encryption
 - API keys are stored using Chrome's secure storage system
 - No logging or tracking of user activities

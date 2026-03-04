@@ -28,20 +28,19 @@ const swaggerDefinition = {
         type: 'http',
         scheme: 'bearer',
         bearerFormat: 'JWT',
-        description: 'JWT authentication token obtained from the /login endpoint. The token should be included in the Authorization header as "Bearer {token}".'
+        description:
+          'JWT authentication token obtained from the /login endpoint. The token should be included in the Authorization header as "Bearer {token}".',
       },
       ApiKeyAuth: {
         type: 'apiKey',
         in: 'header',
         name: 'x-api-key',
-        description: 'API key for programmatic access. This key can be generated or regenerated using the /api/key-regenerate endpoint. Include the key in the x-api-key header for authentication.'
+        description:
+          'API key for programmatic access. This key can be generated or regenerated using the /api/key-regenerate endpoint. Include the key in the x-api-key header for authentication.',
       },
     },
   },
-  security: [
-    { BearerAuth: [] },
-    { ApiKeyAuth: [] }
-  ]
+  security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }],
 };
 
 const options = {

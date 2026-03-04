@@ -11,8 +11,8 @@ if (!fs.existsSync(dataDir)) {
 }
 
 // Initialize database with WAL mode for better performance
-const db = new Database(path.join(dataDir, 'documents.db'), { 
-  //verbose: console.log 
+const db = new Database(path.join(dataDir, 'documents.db'), {
+  //verbose: console.log
 });
 db.pragma('journal_mode = WAL');
 
@@ -74,7 +74,6 @@ const userTable = db.prepare(`
 `);
 userTable.run();
 
-
 // Prepare statements for better performance
 const insertDocument = db.prepare(`
   INSERT INTO processed_documents (document_id, title) 
@@ -84,9 +83,7 @@ const insertDocument = db.prepare(`
   WHERE document_id = ?
 `);
 
-const findDocument = db.prepare(
-  'SELECT * FROM processed_documents WHERE document_id = ?'
-);
+const findDocument = db.prepare('SELECT * FROM processed_documents WHERE document_id = ?');
 
 const insertMetrics = db.prepare(`
   INSERT INTO openai_metrics (document_id, promptTokens, completionTokens, totalTokens)
@@ -150,14 +147,15 @@ const getActiveProcessing = db.prepare(`
   ORDER BY start_time DESC LIMIT 1
 `);
 
-
 module.exports = {
   async addProcessedDocument(documentId, title) {
     try {
       // Bei UNIQUE constraint failure wird der existierende Eintrag aktualisiert
       const result = insertDocument.run(documentId, title, documentId);
       if (result.changes > 0) {
-        console.log(`[DEBUG] Document ${title} ${result.lastInsertRowid ? 'added to' : 'updated in'} processed_documents`);
+        console.log(
+          `[DEBUG] Document ${title} ${result.lastInsertRowid ? 'added to' : 'updated in'} processed_documents`
+        );
         return true;
       }
       return false;
@@ -223,10 +221,14 @@ module.exports = {
   async saveOriginalData(documentId, tags, correspondent, title) {
     try {
       const tagsString = JSON.stringify(tags); // Konvertiere Array zu String
-      const result = db.prepare(`
+      const result = db
+        .prepare(
+          `
         INSERT INTO original_documents (document_id, title, tags, correspondent)
         VALUES (?, ?, ?, ?)
-      `).run(documentId, title, tagsString, correspondent);
+      `
+        )
+        .run(documentId, title, tagsString, correspondent);
       if (result.changes > 0) {
         console.log(`[DEBUG] Original data for document ${title} saved`);
         return true;
@@ -241,10 +243,14 @@ module.exports = {
   async addToHistory(documentId, tagIds, title, correspondent) {
     try {
       const tagIdsString = JSON.stringify(tagIds); // Konvertiere Array zu String
-      const result = db.prepare(`
+      const result = db
+        .prepare(
+          `
         INSERT INTO history_documents (document_id, tags, title, correspondent)
         VALUES (?, ?, ?, ?)
-      `).run(documentId, tagIdsString, title, correspondent);
+      `
+        )
+        .run(documentId, tagIdsString, title, correspondent);
       if (result.changes > 0) {
         console.log(`[DEBUG] Document ${title} added to history`);
         return true;
@@ -323,7 +329,7 @@ module.exports = {
       return 0;
     }
   },
-  
+
   async getPaginatedHistory(limit, offset) {
     try {
       return getPaginatedHistoryDocuments.all(limit, offset);
@@ -351,17 +357,17 @@ module.exports = {
   async deleteDocumentsIdList(idList) {
     try {
       console.log('[DEBUG] Received idList:', idList);
-  
-      const ids = Array.isArray(idList) ? idList : (idList?.ids || []);
-  
+
+      const ids = Array.isArray(idList) ? idList : idList?.ids || [];
+
       if (!Array.isArray(ids) || ids.length === 0) {
         console.error('[ERROR] Invalid input: must provide an array of ids');
         return false;
       }
-  
+
       // Convert string IDs to integers
-      const numericIds = ids.map(id => parseInt(id, 10));
-  
+      const numericIds = ids.map((id) => parseInt(id, 10));
+
       const placeholders = numericIds.map(() => '?').join(', ');
       const query = `DELETE FROM processed_documents WHERE document_id IN (${placeholders})`;
       const query2 = `DELETE FROM history_documents WHERE document_id IN (${placeholders})`;
@@ -370,7 +376,7 @@ module.exports = {
       console.log('[DEBUG] Executing SQL query:', query2);
       console.log('[DEBUG] Executing SQL query:', query3);
       console.log('[DEBUG] With parameters:', numericIds);
-  
+
       const stmt = db.prepare(query);
       const stmt2 = db.prepare(query2);
       const stmt3 = db.prepare(query3);
@@ -389,13 +395,12 @@ module.exports = {
     }
   },
 
-
   async addUser(username, password) {
     try {
       // Lösche alle vorhandenen Benutzer
       const deleteResult = db.prepare('DELETE FROM users').run();
       console.log(`[DEBUG] ${deleteResult.changes} existing users deleted`);
-  
+
       // Füge den neuen Benutzer hinzu
       const result = insertUser.run(username, password);
       if (result.changes > 0) {
@@ -429,7 +434,9 @@ module.exports = {
 
   async getProcessingTimeStats() {
     try {
-      return db.prepare(`
+      return db
+        .prepare(
+          `
         SELECT 
           strftime('%H', processed_at) as hour,
           COUNT(*) as count
@@ -437,16 +444,20 @@ module.exports = {
         WHERE date(processed_at) = date('now')
         GROUP BY hour
         ORDER BY hour
-      `).all();
+      `
+        )
+        .all();
     } catch (error) {
       console.error('[ERROR] getting processing time stats:', error);
       return [];
     }
   },
-  
-  async  getTokenDistribution() {
+
+  async getTokenDistribution() {
     try {
-      return db.prepare(`
+      return db
+        .prepare(
+          `
         SELECT 
           CASE 
             WHEN totalTokens < 1000 THEN '0-1k'
@@ -460,49 +471,57 @@ module.exports = {
         FROM openai_metrics
         GROUP BY range
         ORDER BY range
-      `).all();
+      `
+        )
+        .all();
     } catch (error) {
       console.error('[ERROR] getting token distribution:', error);
       return [];
     }
   },
-  
+
   async getDocumentTypeStats() {
     try {
-      return db.prepare(`
+      return db
+        .prepare(
+          `
         SELECT 
           substr(title, 1, instr(title || ' ', ' ') - 1) as type,
           COUNT(*) as count
         FROM processed_documents
         GROUP BY type
-      `).all();
+      `
+        )
+        .all();
     } catch (error) {
       console.error('[ERROR] getting document type stats:', error);
       return [];
     }
-},
+  },
 
-async setProcessingStatus(documentId, title, status) {
-  try {
+  async setProcessingStatus(documentId, title, status) {
+    try {
       if (status === 'complete') {
-          const result = clearProcessingStatus.run(documentId);
-          return result.changes > 0;
+        const result = clearProcessingStatus.run(documentId);
+        return result.changes > 0;
       } else {
-          const result = upsertProcessingStatus.run(documentId, title, status);
-          return result.changes > 0;
+        const result = upsertProcessingStatus.run(documentId, title, status);
+        return result.changes > 0;
       }
-  } catch (error) {
+    } catch (error) {
       console.error('[ERROR] updating processing status:', error);
       return false;
-  }
-},
+    }
+  },
 
-async getCurrentProcessingStatus() {
-  try {
+  async getCurrentProcessingStatus() {
+    try {
       const active = getActiveProcessing.get();
-      
+
       // Get last processed document with explicit UTC time
-      const lastProcessed = db.prepare(`
+      const lastProcessed = db
+        .prepare(
+          `
           SELECT 
               document_id, 
               title, 
@@ -510,40 +529,47 @@ async getCurrentProcessingStatus() {
           FROM processed_documents 
           ORDER BY processed_at DESC 
           LIMIT 1`
-      ).get();
+        )
+        .get();
 
-      const processedToday = db.prepare(`
+      const processedToday = db
+        .prepare(
+          `
           SELECT COUNT(*) as count 
           FROM processed_documents 
           WHERE date(processed_at) = date('now', 'localtime')`
-      ).get();
+        )
+        .get();
 
       return {
-          currentlyProcessing: active ? {
+        currentlyProcessing: active
+          ? {
               documentId: active.document_id,
               title: active.title,
               startTime: active.start_time,
-              status: active.status
-          } : null,
-          lastProcessed: lastProcessed ? {
+              status: active.status,
+            }
+          : null,
+        lastProcessed: lastProcessed
+          ? {
               documentId: lastProcessed.document_id,
               title: lastProcessed.title,
-              processed_at: lastProcessed.processed_at
-          } : null,
-          processedToday: processedToday.count,
-          isProcessing: !!active
+              processed_at: lastProcessed.processed_at,
+            }
+          : null,
+        processedToday: processedToday.count,
+        isProcessing: !!active,
       };
-  } catch (error) {
+    } catch (error) {
       console.error('[ERROR] getting current processing status:', error);
       return {
-          currentlyProcessing: null,
-          lastProcessed: null,
-          processedToday: 0,
-          isProcessing: false
+        currentlyProcessing: null,
+        lastProcessed: null,
+        processedToday: 0,
+        isProcessing: false,
       };
-  }
-},
-
+    }
+  },
 
   // Utility method to close the database connection
   closeDatabase() {
@@ -557,5 +583,5 @@ async getCurrentProcessingStatus() {
         reject(error);
       }
     });
-  }
+  },
 };
