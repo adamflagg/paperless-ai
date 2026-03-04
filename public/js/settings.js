@@ -105,6 +105,7 @@ class FormManager {
         const ollamaSettings = document.getElementById('ollamaSettings');
         const customSettings = document.getElementById('customSettings');
         const azureSettings = document.getElementById('azureSettings');
+        const geminiSettings = document.getElementById('geminiSettings');
 
         // Get all provider-specific fields
         const openaiKey = document.getElementById('openaiKey');
@@ -117,6 +118,7 @@ class FormManager {
         const azureEndpoint = document.getElementById('azureEndpoint');
         const azureDeploymentName = document.getElementById('azureDeploymentName');
         const azureApiVersion = document.getElementById('azureApiVersion');
+        const geminiApiKey = document.getElementById('geminiApiKey');
 
         // Restriction settings
         const restrictToExistingTags = document.getElementById('restrictToExistingTags');
@@ -131,14 +133,15 @@ class FormManager {
         const externalApiBody = document.getElementById('externalApiBody');
         const externalApiTimeout = document.getElementById('externalApiTimeout');
         const externalApiTransformationTemplate = document.getElementById('externalApiTransformationTemplate');
-        
-        
+
+
         // Hide all settings sections first
         openaiSettings.classList.add('hidden');
         ollamaSettings.classList.add('hidden');
         customSettings.classList.add('hidden');
         azureSettings.classList.add('hidden');
-        
+        geminiSettings.classList.add('hidden');
+
         // Reset all required fields
         openaiKey.required = false;
         ollamaUrl.required = false;
@@ -150,7 +153,8 @@ class FormManager {
         azureEndpoint.required = false;
         azureDeploymentName.required = false;
         azureApiVersion.required = false;
-        
+        geminiApiKey.required = false;
+
         // Show and set required fields based on selected provider
         switch (provider) {
             case 'openai':
@@ -174,6 +178,10 @@ class FormManager {
                 azureEndpoint.required = true;
                 azureDeploymentName.required = true;
                 azureApiVersion.required = true;
+                break;
+            case 'gemini':
+                geminiSettings.classList.remove('hidden');
+                geminiApiKey.required = true;
                 break;
         }
     }

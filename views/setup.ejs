@@ -209,6 +209,9 @@
                                             <option value="azure" <%= config.AI_PROVIDER === 'azure' ? 'selected' : '' %>>
                                                 Azure
                                             </option>
+                                            <option value="gemini" <%= config.AI_PROVIDER === 'gemini' ? 'selected' : '' %>>
+                                                Google Gemini
+                                            </option>
                                         </select>
                                     </div>
 
@@ -344,6 +347,38 @@
                                                    value="<%= config.AZURE_API_VERSION %>"
                                                    class="modern-input"
                                                    placeholder="Enter API version">
+                                        </div>
+                                    </div>
+
+                                    <!-- Gemini Settings -->
+                                    <div id="geminiSettings" class="provider-settings">
+                                        <div class="form-group">
+                                            <label for="geminiApiKey">Gemini API Key</label>
+                                            <div class="password-input">
+                                                <input type="password"
+                                                       id="geminiApiKey"
+                                                       name="geminiApiKey"
+                                                       value="<%= config.GEMINI_API_KEY %>"
+                                                       class="modern-input">
+                                                <button type="button" class="password-toggle" data-input="geminiApiKey">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div class="form-group">
+                                            <label for="geminiModel">Gemini Model</label>
+                                            <select id="geminiModel"
+                                                    name="geminiModel"
+                                                    class="modern-input">
+                                                <option value="gemini-3-flash-preview" <%= config.GEMINI_MODEL === 'gemini-3-flash-preview' ? 'selected' : '' %>>Gemini 3 Flash Preview</option>
+                                                <option value="gemini-3-pro-preview" <%= config.GEMINI_MODEL === 'gemini-3-pro-preview' ? 'selected' : '' %>>Gemini 3 Pro Preview</option>
+                                                <option value="gemini-2.5-flash" <%= config.GEMINI_MODEL === 'gemini-2.5-flash' ? 'selected' : '' %>>Gemini 2.5 Flash</option>
+                                                <option value="gemini-2.5-pro" <%= config.GEMINI_MODEL === 'gemini-2.5-pro' ? 'selected' : '' %>>Gemini 2.5 Pro</option>
+                                                <option value="gemini-2.0-flash" <%= config.GEMINI_MODEL === 'gemini-2.0-flash' ? 'selected' : '' %>>Gemini 2.0 Flash</option>
+                                                <option value="gemini-1.5-pro" <%= config.GEMINI_MODEL === 'gemini-1.5-pro' ? 'selected' : '' %>>Gemini 1.5 Pro</option>
+                                                <option value="gemini-1.5-flash" <%= config.GEMINI_MODEL === 'gemini-1.5-flash' ? 'selected' : '' %>>Gemini 1.5 Flash</option>
+                                            </select>
                                         </div>
                                     </div>
 
