@@ -12,8 +12,8 @@ export default defineConfig({
       exclude: ['node_modules/', 'tests/', 'public/', 'views/'],
       thresholds: {
         lines: 10,
-        functions: 10,
-        branches: 5,
+        functions: 20,
+        branches: 10,
         statements: 10,
       },
     },
