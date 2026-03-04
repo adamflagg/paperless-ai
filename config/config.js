@@ -1,7 +1,7 @@
 const path = require('path');
 const currentDir = decodeURIComponent(process.cwd());
 const envPath = path.join(currentDir, 'data', '.env');
-console.log('Loading .env from:', envPath); // Debug log
+console.debug('Loading .env from:', envPath); // Debug log
 require('dotenv').config({ path: envPath });
 
 // Helper function to parse boolean-like env vars
@@ -51,7 +51,7 @@ const externalApiConfig = {
   transformationTemplate: process.env.EXTERNAL_API_TRANSFORM || '',
 };
 
-console.log('Loaded environment variables:', {
+console.debug('Loaded environment variables:', {
   PAPERLESS_API_URL: process.env.PAPERLESS_API_URL,
   PAPERLESS_API_TOKEN: '******',
   LIMIT_FUNCTIONS: limitFunctions,
@@ -62,6 +62,34 @@ console.log('Loaded environment variables:', {
 module.exports = {
   PAPERLESS_AI_VERSION: '3.0.9',
   CONFIGURED: false,
+
+  // Server config
+  port: parseInt(process.env.PAPERLESS_AI_PORT || '3000', 10),
+  get nodeEnv() {
+    return process.env.NODE_ENV || 'development';
+  },
+  logLevel: process.env.LOG_LEVEL || 'info',
+
+  // Security config — getters so tests that mutate process.env still work
+  get jwtSecret() {
+    return process.env.JWT_SECRET;
+  },
+  get apiKey() {
+    return process.env.API_KEY;
+  },
+
+  // CORS config
+  corsOrigins: process.env.CORS_ORIGINS,
+
+  // RAG config
+  ragServiceUrl: process.env.RAG_SERVICE_URL || 'http://localhost:8000',
+  ragServiceEnabled: process.env.RAG_SERVICE_ENABLED || 'true',
+
+  // Initial setup flag
+  get initialSetup() {
+    return process.env.PAPERLESS_AI_INITIAL_SETUP;
+  },
+
   disableAutomaticProcessing: process.env.DISABLE_AUTOMATIC_PROCESSING || 'no',
   predefinedMode: process.env.PROCESS_PREDEFINED_DOCUMENTS,
   tokenLimit: process.env.TOKEN_LIMIT || 128000,

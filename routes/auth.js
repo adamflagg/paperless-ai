@@ -1,9 +1,10 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const config = require('../config/config');
 
 // Generate an ephemeral secret when JWT_SECRET is not configured (e.g. first-run setup wizard).
 // Sessions signed with this secret will not survive restarts.
-let JWT_SECRET = process.env.JWT_SECRET;
+let JWT_SECRET = config.jwtSecret;
 if (!JWT_SECRET) {
   JWT_SECRET = crypto.randomBytes(64).toString('hex');
   console.warn(
@@ -27,7 +28,7 @@ const authenticateJWT = (req, res, next) => {
   const token = req.cookies.jwt || req.headers.authorization?.split(' ')[1];
   const apiKey = req.headers['x-api-key'];
 
-  if (apiKey && process.env.API_KEY && safeCompare(apiKey, process.env.API_KEY)) {
+  if (apiKey && config.apiKey && safeCompare(apiKey, config.apiKey)) {
     req.user = { apiKey: true };
     return next();
   }
@@ -49,7 +50,7 @@ const isAuthenticated = (req, res, next) => {
   const token = req.cookies.jwt || req.headers.authorization?.split(' ')[1];
   const apiKey = req.headers['x-api-key'];
 
-  if (apiKey && process.env.API_KEY && safeCompare(apiKey, process.env.API_KEY)) {
+  if (apiKey && config.apiKey && safeCompare(apiKey, config.apiKey)) {
     req.user = { apiKey: true };
     return next();
   }

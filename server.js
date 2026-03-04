@@ -11,9 +11,6 @@ const setupService = require('./services/setupService');
 const { createAuthSetupMiddleware } = require('./middleware/authSetup');
 const setupRoutes = require('./routes/setup');
 
-// Add environment variables for RAG service if not already set
-process.env.RAG_SERVICE_URL = process.env.RAG_SERVICE_URL || 'http://localhost:8000';
-process.env.RAG_SERVICE_ENABLED = process.env.RAG_SERVICE_ENABLED || 'true';
 const helmet = require('helmet');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
@@ -45,9 +42,9 @@ app.use(
   })
 );
 
-const allowedOrigins = process.env.CORS_ORIGINS
-  ? process.env.CORS_ORIGINS.split(',').map((s) => s.trim())
-  : [process.env.PAPERLESS_API_URL].filter(Boolean);
+const allowedOrigins = config.corsOrigins
+  ? config.corsOrigins.split(',').map((s) => s.trim())
+  : [config.paperless.apiUrl].filter(Boolean);
 
 app.use(
   cors({
@@ -507,7 +504,7 @@ require('./routes/auth');
 const ragRoutes = require('./routes/rag');
 
 // Mount RAG routes if enabled
-if (process.env.RAG_SERVICE_ENABLED === 'true') {
+if (config.ragServiceEnabled === 'true') {
   app.use('/api/rag', ragRoutes);
 
   // RAG UI route
@@ -629,7 +626,7 @@ async function startScanning() {
     const isConfigured = await setupService.isConfigured();
     if (!isConfigured) {
       console.log(
-        `Setup not completed. Visit http://your-machine-ip:${process.env.PAPERLESS_AI_PORT || 3000}/setup to complete setup.`
+        `Setup not completed. Visit http://your-machine-ip:${config.port}/setup to complete setup.`
       );
     }
 
@@ -697,7 +694,7 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Start server
 async function startServer() {
-  const port = process.env.PAPERLESS_AI_PORT || 3000;
+  const port = config.port;
   try {
     await initializeDataDirectory();
     await saveOpenApiSpec(); // Save OpenAPI specification on startup

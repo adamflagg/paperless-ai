@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const config = require('../config/config');
 const { JWT_SECRET } = require('../routes/auth');
 
 /**
@@ -40,7 +41,7 @@ function createAuthSetupMiddleware(setupService) {
     const token = req.cookies.jwt || req.headers.authorization?.split(' ')[1];
     const apiKey = req.headers['x-api-key'];
 
-    if (apiKey && process.env.API_KEY && safeCompare(apiKey, process.env.API_KEY)) {
+    if (apiKey && config.apiKey && safeCompare(apiKey, config.apiKey)) {
       req.user = { apiKey: true };
     } else if (!token) {
       if (req.path.startsWith('/api/')) {
@@ -65,14 +66,13 @@ function createAuthSetupMiddleware(setupService) {
       const isConfigured = await setupService.isConfigured();
       if (
         !isConfigured &&
-        (!process.env.PAPERLESS_AI_INITIAL_SETUP ||
-          process.env.PAPERLESS_AI_INITIAL_SETUP === 'no') &&
+        (!config.initialSetup || config.initialSetup === 'no') &&
         !req.path.startsWith('/setup')
       ) {
         return res.redirect('/setup');
       } else if (
         !isConfigured &&
-        process.env.PAPERLESS_AI_INITIAL_SETUP === 'yes' &&
+        config.initialSetup === 'yes' &&
         !req.path.startsWith('/settings')
       ) {
         return res.redirect('/settings');
