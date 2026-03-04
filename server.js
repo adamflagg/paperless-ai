@@ -603,13 +603,9 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// Error handler
-// Express error handlers require all 4 params for Express to identify them as error middleware
-// eslint-disable-next-line no-unused-vars
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).send('Something broke!');
-});
+// Centralized error handler
+const errorHandler = require('./middleware/errorHandler');
+app.use(errorHandler);
 
 // Start scanning
 async function startScanning() {
