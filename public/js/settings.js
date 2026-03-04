@@ -122,24 +122,6 @@ class FormManager {
     const azureApiVersion = document.getElementById('azureApiVersion');
     const geminiApiKey = document.getElementById('geminiApiKey');
 
-    // Restriction settings
-    const restrictToExistingTags = document.getElementById('restrictToExistingTags');
-    const restrictToExistingCorrespondents = document.getElementById(
-      'restrictToExistingCorrespondents'
-    );
-
-    // External API settings
-    const externalApiEnabled = document.getElementById('externalApiEnabled');
-    const externalApiSettings = document.getElementById('externalApiSettings');
-    const externalApiUrl = document.getElementById('externalApiUrl');
-    const externalApiMethod = document.getElementById('externalApiMethod');
-    const externalApiHeaders = document.getElementById('externalApiHeaders');
-    const externalApiBody = document.getElementById('externalApiBody');
-    const externalApiTimeout = document.getElementById('externalApiTimeout');
-    const externalApiTransformationTemplate = document.getElementById(
-      'externalApiTransformationTemplate'
-    );
-
     // Hide all settings sections first
     openaiSettings.classList.add('hidden');
     ollamaSettings.classList.add('hidden');
@@ -454,11 +436,11 @@ For the language:
 
 // Initialize everything when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-  const themeManager = new ThemeManager();
-  const formManager = new FormManager();
-  const tagsManager = new TagsManager('tagInput', 'tagsContainer', 'tags');
-  const promptTagsManager = new TagsManager('promptTagInput', 'promptTagsContainer', 'promptTags');
-  const promptManager = new PromptManager();
+  new ThemeManager();
+  new FormManager();
+  new TagsManager('tagInput', 'tagsContainer', 'tags');
+  new TagsManager('promptTagInput', 'promptTagsContainer', 'promptTags');
+  new PromptManager();
 
   // Initialize textarea newlines
   const systemPromptTextarea = document.getElementById('systemPrompt');
@@ -466,7 +448,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Form Submission Handler
-document.addEventListener('DOMContentLoaded', (event) => {
+document.addEventListener('DOMContentLoaded', () => {
   const systemPromptTextarea = document.getElementById('systemPrompt');
   systemPromptTextarea.value = systemPromptTextarea.value.replace(/\\n/g, '\n');
 
@@ -507,7 +489,7 @@ document.addEventListener('DOMContentLoaded', (event) => {
 
         if (result.restart) {
           let countdown = 5;
-          const alert = Swal.fire({
+          Swal.fire({
             title: 'Restarting...',
             text: `Application will restart in ${countdown} seconds`,
             icon: 'info',
@@ -530,11 +512,11 @@ document.addEventListener('DOMContentLoaded', (event) => {
       } else {
         throw new Error(result.error || 'An unknown error occurred');
       }
-    } catch (error) {
+    } catch (err) {
       await Swal.fire({
         icon: 'error',
         title: 'Error',
-        text: error.message,
+        text: err.message,
       });
     } finally {
       submitBtn.disabled = false;
@@ -603,7 +585,7 @@ class URLValidator {
       if (!this.urlInput.value) return;
       const url = new URL(this.urlInput.value);
       this.urlInput.value = `${url.protocol}//${url.hostname}${url.port ? ':' + url.port : ''}`;
-    } catch (error) {
+    } catch (_error) {
       Swal.fire({
         icon: 'error',
         title: 'Invalid URL',
@@ -691,8 +673,8 @@ class TooltipManager {
 
 // Initialize all components
 document.addEventListener('DOMContentLoaded', () => {
-  const urlValidator = new URLValidator();
-  const tooltipManager = new TooltipManager();
+  new URLValidator();
+  new TooltipManager();
 });
 
 // Custom Fields Management
@@ -908,6 +890,7 @@ function addCustomField() {
   updateCustomFieldsJson();
 }
 
+// eslint-disable-next-line no-unused-vars
 function removeCustomField(button) {
   const fieldItem = button.closest('.custom-field-item');
   Swal.fire({

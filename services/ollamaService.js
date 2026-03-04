@@ -1,16 +1,10 @@
-const {
-  calculateTokens,
-  calculateTotalPromptTokens,
-  truncateToTokenLimit,
-  writePromptToFile,
-} = require('./serviceUtils');
+const { calculateTokens, writePromptToFile } = require('./serviceUtils');
 const axios = require('axios');
 const config = require('../config/config');
 const fs = require('fs').promises;
 const path = require('path');
 const paperlessService = require('./paperlessService');
 const os = require('os');
-const OpenAI = require('openai');
 const RestrictionPromptService = require('./restrictionPromptService');
 
 /**
@@ -292,7 +286,6 @@ class OllamaService {
     options = {}
   ) {
     let systemPrompt;
-    let promptTags = '';
 
     // Validate that existingCorrespondent is an array and handle if it's not
     const correspondentList = Array.isArray(existingCorrespondent) ? existingCorrespondent : [];
@@ -362,11 +355,9 @@ class OllamaService {
         process.env.SYSTEM_PROMPT +
         '\n\n' +
         config.mustHavePrompt.replace('%CUSTOMFIELDS%', customFieldsStr);
-      promptTags = '';
     } else {
       config.mustHavePrompt = config.mustHavePrompt.replace('%CUSTOMFIELDS%', customFieldsStr);
       systemPrompt = process.env.SYSTEM_PROMPT + '\n\n' + config.mustHavePrompt;
-      promptTags = '';
     }
 
     // Get validated external API data if available
@@ -398,7 +389,6 @@ class OllamaService {
     }
 
     if (process.env.USE_PROMPT_TAGS === 'yes') {
-      promptTags = process.env.PROMPT_TAGS;
       systemPrompt =
         `
             Take these tags and try to match one or more to the document content.\n\n
@@ -573,7 +563,7 @@ class OllamaService {
     try {
       await fs.access(cachePath);
       console.log('[DEBUG] Thumbnail already cached');
-    } catch (err) {
+    } catch (_err) {
       console.log('Thumbnail not cached, fetching from Paperless');
       const thumbnailData = await paperlessService.getThumbnailImage(id);
       if (!thumbnailData) {
@@ -691,7 +681,7 @@ class OllamaService {
             document_date: sanitizedResult.document_date || null,
             language: sanitizedResult.language || null,
           };
-        } catch (finalError) {
+        } catch (_finalError) {
           console.error(
             'Final JSON parsing failed after sanitization. This happens when the JSON structure is too complex or invalid. That indicates an issue with the generated JSON string by Ollama. Switch to OpenAI for better results or fine tune your prompt.'
           );

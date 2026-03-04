@@ -96,8 +96,8 @@ async function sendMessage(message) {
               const chatHistory = document.getElementById('chatHistory');
               chatHistory.scrollTop = chatHistory.scrollHeight;
             }
-          } catch (e) {
-            console.error('Error parsing SSE data:', e);
+          } catch (_e) {
+            console.error('Error parsing SSE data:', _e);
           }
         }
       }
@@ -126,7 +126,7 @@ function addMessage(message, isUser = true) {
         const jsonResponse = JSON.parse(message);
         messageContent = jsonResponse.reply || jsonResponse.message || message;
       }
-    } catch (e) {
+    } catch (_e) {
       console.log('Message is not JSON, using as is');
     }
 
@@ -162,6 +162,7 @@ function escapeHtml(unsafe) {
     .replace(/'/g, '&#039;');
 }
 
+// eslint-disable-next-line no-unused-vars
 function toggleTheme() {
   const currentTheme = document.body.getAttribute('data-theme');
   const newTheme = currentTheme === 'light' ? 'dark' : 'light';
@@ -221,7 +222,7 @@ document.addEventListener('DOMContentLoaded', function () {
 document
   .getElementById('messageForm')
   .querySelector('.send-button')
-  .addEventListener('click', async (e) => {
+  .addEventListener('click', async () => {
     await submitForm();
   });
 

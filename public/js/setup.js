@@ -25,7 +25,7 @@ class ThemeManager {
     this.updateShepherdTheme(theme);
   }
 
-  updateShepherdTheme(theme) {
+  updateShepherdTheme(_theme) {
     const activeTooltips = document.querySelectorAll('.shepherd-element');
     activeTooltips.forEach((tooltip) => {
       tooltip.style.background = getComputedStyle(document.documentElement).getPropertyValue(
@@ -740,7 +740,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Initialize textarea newlines
-document.addEventListener('DOMContentLoaded', (event) => {
+document.addEventListener('DOMContentLoaded', () => {
   const systemPromptTextarea = document.getElementById('systemPrompt');
   systemPromptTextarea.value = systemPromptTextarea.value.replace(/\\n/g, '\n');
 });
@@ -846,6 +846,7 @@ function addCustomField() {
   updateCustomFieldsJson();
 }
 
+// eslint-disable-next-line no-unused-vars
 function removeCustomField(button) {
   const fieldItem = button.closest('.custom-field-item');
   Swal.fire({

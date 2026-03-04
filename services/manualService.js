@@ -1,14 +1,8 @@
-const {
-  calculateTokens,
-  calculateTotalPromptTokens,
-  truncateToTokenLimit,
-  writePromptToFile,
-} = require('./serviceUtils');
+const { writePromptToFile } = require('./serviceUtils');
 const axios = require('axios');
 const OpenAI = require('openai');
 const config = require('../config/config');
 const AzureOpenAI = require('openai').AzureOpenAI;
-const emptyVar = null;
 
 class ManualService {
   constructor() {
@@ -51,9 +45,8 @@ class ManualService {
     }
   }
 
-  async _analyzeOpenAI(content, existingTags) {
+  async _analyzeOpenAI(content, _existingTags) {
     try {
-      const existingTagsList = existingTags.map((tag) => tag.name).join(', ');
       const model = process.env.OPENAI_MODEL;
       const systemPrompt = process.env.SYSTEM_PROMPT;
       await writePromptToFile(systemPrompt, content);
@@ -100,10 +93,8 @@ class ManualService {
     }
   }
 
-  async _analyzeAzure(content, existingTags) {
+  async _analyzeAzure(content, _existingTags) {
     try {
-      const existingTagsList = existingTags.map((tag) => tag.name).join(', ');
-
       const systemPrompt = process.env.SYSTEM_PROMPT;
       await writePromptToFile(systemPrompt, content);
       const response = await this.openai.chat.completions.create({
@@ -149,10 +140,8 @@ class ManualService {
     }
   }
 
-  async _analyzeCustom(content, existingTags) {
+  async _analyzeCustom(content, _existingTags) {
     try {
-      const existingTagsList = existingTags.map((tag) => tag.name).join(', ');
-
       const systemPrompt = process.env.SYSTEM_PROMPT;
       const model = config.custom.model;
       const response = await this.openai.chat.completions.create({
@@ -189,7 +178,7 @@ class ManualService {
     }
   }
 
-  async _analyzeOllama(content, existingTags) {
+  async _analyzeOllama(_content, _existingTags) {
     try {
       const prompt = process.env.SYSTEM_PROMPT;
 
@@ -218,7 +207,7 @@ class ManualService {
         return Math.ceil(prompt.length / 4);
       };
 
-      const { freeMemoryMB } = await getAvailableMemory();
+      await getAvailableMemory();
       const expectedResponseTokens = 1024;
       const promptTokenCount = calculatePromptTokenCount(prompt);
 

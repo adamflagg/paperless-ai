@@ -11,7 +11,7 @@ class RestrictionPromptService {
    * @param {Object} config - Configuration object (unused but kept for compatibility)
    * @returns {string} - Prompt with placeholders replaced
    */
-  static processRestrictionsInPrompt(prompt, existingTags, existingCorrespondentList, config) {
+  static processRestrictionsInPrompt(prompt, existingTags, existingCorrespondentList, _config) {
     // Replace placeholders in the original prompt
     return this._replacePlaceholders(prompt, existingTags, existingCorrespondentList);
   }

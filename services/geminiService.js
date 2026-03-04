@@ -44,7 +44,7 @@ class GeminiService {
       try {
         await fs.access(cachePath);
         console.log('[DEBUG] Thumbnail already cached');
-      } catch (err) {
+      } catch (_err) {
         console.log('Thumbnail not cached, fetching from Paperless');
 
         const thumbnailData = await paperlessService.getThumbnailImage(id);

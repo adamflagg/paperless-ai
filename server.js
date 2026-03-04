@@ -15,18 +15,17 @@ process.env.RAG_SERVICE_ENABLED = process.env.RAG_SERVICE_ENABLED || 'true';
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const Logger = require('./services/loggerService');
-const { max } = require('date-fns');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 
-const htmlLogger = new Logger({
+new Logger({
   logFile: 'logs.html',
   format: 'html',
   timestamp: true,
   maxFileSize: 1024 * 1024 * 10,
 });
 
-const txtLogger = new Logger({
+new Logger({
   logFile: 'logs.txt',
   format: 'txt',
   timestamp: true,
@@ -186,8 +185,7 @@ async function processDocument(
   doc,
   existingTags,
   existingCorrespondentList,
-  existingDocumentTypesList,
-  ownUserId
+  existingDocumentTypesList
 ) {
   const isProcessed = await documentModel.isDocumentProcessed(doc.id);
   if (isProcessed) return null;
@@ -383,7 +381,7 @@ async function scanInitial() {
       return;
     }
 
-    let [existingTags, documents, ownUserId, existingCorrespondentList, existingDocumentTypes] =
+    let [existingTags, documents, , existingCorrespondentList, existingDocumentTypes] =
       await Promise.all([
         paperlessService.getTags(),
         paperlessService.getAllDocuments(),
@@ -406,8 +404,7 @@ async function scanInitial() {
           doc,
           existingTagNames,
           existingCorrespondentList,
-          existingDocumentTypesList,
-          ownUserId
+          existingDocumentTypesList
         );
         if (!result) continue;
 
@@ -431,7 +428,7 @@ async function scanDocuments() {
 
   runningTask = true;
   try {
-    let [existingTags, documents, ownUserId, existingCorrespondentList, existingDocumentTypes] =
+    let [existingTags, documents, , existingCorrespondentList, existingDocumentTypes] =
       await Promise.all([
         paperlessService.getTags(),
         paperlessService.getAllDocuments(),
@@ -457,8 +454,7 @@ async function scanDocuments() {
           doc,
           existingTagNames,
           existingCorrespondentList,
-          existingDocumentTypesList,
-          ownUserId
+          existingDocumentTypesList
         );
         if (!result) continue;
 
@@ -479,7 +475,7 @@ async function scanDocuments() {
 
 // Routes
 app.use('/', setupRoutes);
-const authRoutes = require('./routes/auth');
+require('./routes/auth');
 const ragRoutes = require('./routes/rag');
 
 // Mount RAG routes if enabled
@@ -596,6 +592,8 @@ app.get('/health', async (req, res) => {
 });
 
 // Error handler
+// Express error handlers require all 4 params for Express to identify them as error middleware
+// eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).send('Something broke!');

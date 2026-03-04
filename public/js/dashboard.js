@@ -222,6 +222,7 @@ class NavigationManager {
 }
 
 // API Functions
+// eslint-disable-next-line no-unused-vars
 async function showTagDetails() {
   modalManager.showModal('Tag Overview');
   modalManager.showLoader();
@@ -252,6 +253,7 @@ async function showTagDetails() {
   }
 }
 
+// eslint-disable-next-line no-unused-vars
 async function showCorrespondentDetails() {
   modalManager.showModal('Correspondent Overview');
   modalManager.showLoader();

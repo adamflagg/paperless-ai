@@ -2,7 +2,6 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
-const { get } = require('http');
 
 // Ensure data directory exists
 const dataDir = path.join(process.cwd(), 'data');
@@ -90,12 +89,12 @@ const insertMetrics = db.prepare(`
   VALUES (?, ?, ?, ?)
 `);
 
-const insertOriginal = db.prepare(`
+db.prepare(`
   INSERT INTO original_documents (document_id, title, tags, correspondent)
   VALUES (?, ?, ?, ?)
 `);
 
-const insertHistory = db.prepare(`
+db.prepare(`
   INSERT INTO history_documents (document_id, tags, title, correspondent)
   VALUES (?, ?, ?, ?)
 `);

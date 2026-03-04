@@ -1,5 +1,4 @@
 const jwt = require('jsonwebtoken');
-const config = require('../config/config');
 
 // JWT secret key - should be moved to environment variables
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
@@ -22,7 +21,7 @@ const authenticateJWT = (req, res, next) => {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
     next();
-  } catch (error) {
+  } catch (_error) {
     return res.status(403).json({ message: 'Invalid or expired token' });
   }
 };
@@ -44,7 +43,7 @@ const isAuthenticated = (req, res, next) => {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
     next();
-  } catch (error) {
+  } catch (_error) {
     res.clearCookie('jwt');
     return res.redirect('/login');
   }
