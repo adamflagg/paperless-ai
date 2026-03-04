@@ -1,6 +1,7 @@
 // services/paperlessService.js
 const axios = require('axios');
 const config = require('../config/config');
+const { DEFAULT_PAGE_SIZE } = require('../config/constants');
 const { parse, isValid, parseISO, format } = require('date-fns');
 
 class PaperlessService {
@@ -431,7 +432,7 @@ class PaperlessService {
       try {
         const params = {
           page,
-          page_size: 100, // Maximale Seitengröße für effizientes Laden
+          page_size: DEFAULT_PAGE_SIZE,
           ordering: 'name', // Optional: Sortierung nach Namen
         };
 
@@ -602,7 +603,7 @@ class PaperlessService {
             fields: 'name',
             count: true,
             page: currentPage,
-            page_size: 100, // Sie können die Seitengröße nach Bedarf anpassen
+            page_size: DEFAULT_PAGE_SIZE,
           },
         });
 
@@ -669,7 +670,7 @@ class PaperlessService {
       try {
         const params = {
           page,
-          page_size: 100,
+          page_size: DEFAULT_PAGE_SIZE,
           fields: 'id,title,created,created_date,added,tags,correspondent',
         };
 
@@ -724,7 +725,7 @@ class PaperlessService {
       const response = await this.client.get('/documents/', {
         params: {
           page,
-          page_size: 100,
+          page_size: DEFAULT_PAGE_SIZE,
           fields: 'id',
         },
       });
@@ -785,7 +786,7 @@ class PaperlessService {
       try {
         const params = {
           page,
-          page_size: 100,
+          page_size: DEFAULT_PAGE_SIZE,
           fields: 'id',
         };
 
@@ -897,7 +898,7 @@ class PaperlessService {
           const params = {
             params: { fields: 'id,title,tags,correspondent,created,content' },
             page,
-            page_size: 100, // Maximale Seitengröße für effizientes Laden
+            page_size: DEFAULT_PAGE_SIZE,
             ordering: 'name', // Optional: Sortierung nach Namen
           };
 

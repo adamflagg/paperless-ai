@@ -1,6 +1,7 @@
 const { calculateTokens, writePromptToFile } = require('./serviceUtils');
 const axios = require('axios');
 const config = require('../config/config');
+const { OLLAMA_TIMEOUT_MS, EXTERNAL_API_DATA_MAX_TOKENS } = require('../config/constants');
 const os = require('os');
 const BaseAIService = require('./baseAIService');
 const RestrictionPromptService = require('./restrictionPromptService');
@@ -19,7 +20,7 @@ class OllamaService extends BaseAIService {
     this.apiUrl = config.ollama.apiUrl;
     this.model = config.ollama.model;
     this.client = axios.create({
-      timeout: 1800000, // 30 minutes timeout
+      timeout: OLLAMA_TIMEOUT_MS,
     });
 
     // JSON schema for document analysis output
@@ -376,7 +377,7 @@ class OllamaService extends BaseAIService {
    * @param {number} maxTokens
    * @returns {string|null}
    */
-  _validateAndTruncateExternalApiDataSync(apiData, maxTokens = 500) {
+  _validateAndTruncateExternalApiDataSync(apiData, maxTokens = EXTERNAL_API_DATA_MAX_TOKENS) {
     if (!apiData) {
       return null;
     }

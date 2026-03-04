@@ -1,6 +1,7 @@
 const tiktoken = require('tiktoken');
 const fs = require('fs').promises;
 const path = require('path');
+const { MAX_LOG_FILE_SIZE } = require('../config/constants');
 
 // Map non-OpenAI models to compatible OpenAI encodings or use estimation
 function getCompatibleModel(model) {
@@ -201,7 +202,7 @@ async function writePromptToFile(
   systemPrompt,
   truncatedContent,
   filePath = './logs/prompt.txt',
-  maxSize = 10 * 1024 * 1024
+  maxSize = MAX_LOG_FILE_SIZE
 ) {
   try {
     // Ensure the logs directory exists

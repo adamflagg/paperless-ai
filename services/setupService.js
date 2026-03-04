@@ -3,6 +3,10 @@ const path = require('path');
 const axios = require('axios');
 const { OpenAI } = require('openai');
 const config = require('../config/config');
+const {
+  SETUP_VALIDATION_MAX_RETRIES,
+  SETUP_VALIDATION_INTERVAL_MS,
+} = require('../config/constants');
 const AzureOpenAI = require('openai').AzureOpenAI;
 const { GoogleGenAI } = require('@google/genai');
 
@@ -282,8 +286,8 @@ class SetupService {
       return this.configured;
     }
 
-    const maxAttempts = 60; // 5 minutes = 300 seconds, attempting every 5 seconds = 60 attempts
-    const delayBetweenAttempts = 5000; // 5 seconds in milliseconds
+    const maxAttempts = SETUP_VALIDATION_MAX_RETRIES;
+    const delayBetweenAttempts = SETUP_VALIDATION_INTERVAL_MS;
     let attempts = 0;
 
     // First check if .env exists and if PAPERLESS_API_URL is set

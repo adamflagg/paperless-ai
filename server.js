@@ -3,6 +3,7 @@ const cron = require('node-cron');
 const path = require('path');
 const fs = require('fs').promises;
 const config = require('./config/config');
+const { MAX_LOG_FILE_SIZE, MAX_JSON_PAYLOAD } = require('./config/constants');
 const paperlessService = require('./services/paperlessService');
 const AIServiceFactory = require('./services/aiServiceFactory');
 const documentModel = require('./models/document');
@@ -22,14 +23,14 @@ new Logger({
   logFile: 'logs.html',
   format: 'html',
   timestamp: true,
-  maxFileSize: 1024 * 1024 * 10,
+  maxFileSize: MAX_LOG_FILE_SIZE,
 });
 
 new Logger({
   logFile: 'logs.txt',
   format: 'txt',
   timestamp: true,
-  maxFileSize: 1024 * 1024 * 10,
+  maxFileSize: MAX_LOG_FILE_SIZE,
 });
 
 const app = express();
@@ -59,8 +60,8 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(express.json({ limit: MAX_JSON_PAYLOAD }));
+app.use(express.urlencoded({ limit: MAX_JSON_PAYLOAD, extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(cookieParser());
 

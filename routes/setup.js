@@ -10,6 +10,7 @@ const documentModel = require('../models/document.js');
 const AIServiceFactory = require('../services/aiServiceFactory');
 const debugService = require('../services/debugService.js');
 const configFile = require('../config/config.js');
+const { JWT_EXPIRY, JWT_COOKIE_MAX_AGE_MS } = require('../config/constants');
 const ChatService = require('../services/chatService.js');
 const documentsService = require('../services/documentsService.js');
 const RAGService = require('../services/ragService.js');
@@ -356,14 +357,14 @@ router.post('/login', async (req, res) => {
           username: user.username,
         },
         JWT_SECRET,
-        { expiresIn: '24h' }
+        { expiresIn: JWT_EXPIRY }
       );
       res.cookie('jwt', token, {
         httpOnly: true,
         secure: false,
         sameSite: 'lax',
         path: '/',
-        maxAge: 24 * 60 * 60 * 1000,
+        maxAge: JWT_COOKIE_MAX_AGE_MS,
       });
 
       return res.redirect('/dashboard');

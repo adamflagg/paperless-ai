@@ -4,6 +4,7 @@ const { writePromptToFile } = require('./serviceUtils');
 const axios = require('axios');
 const OpenAI = require('openai');
 const config = require('../config/config');
+const { MANUAL_SERVICE_TIMEOUT_MS } = require('../config/constants');
 const AzureOpenAI = require('openai').AzureOpenAI;
 
 class ManualService {
@@ -23,7 +24,7 @@ class ManualService {
     } else {
       this.openai = new OpenAI({ apiKey: config.openai.apiKey });
       this.ollama = axios.create({
-        timeout: 300000,
+        timeout: MANUAL_SERVICE_TIMEOUT_MS,
       });
     }
   }

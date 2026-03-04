@@ -5,6 +5,7 @@ const {
   writePromptToFile,
 } = require('./serviceUtils');
 const config = require('../config/config');
+const { EXTERNAL_API_DATA_MAX_TOKENS } = require('../config/constants');
 const paperlessService = require('./paperlessService');
 const fs = require('fs').promises;
 const path = require('path');
@@ -297,11 +298,15 @@ class BaseAIService {
    * Identical in openai/gemini/azure/custom (ollama uses a simpler char-based variant).
    *
    * @param {any} apiData
-   * @param {number} maxTokens - Maximum tokens allowed (default 500)
+   * @param {number} maxTokens - Maximum tokens allowed (default EXTERNAL_API_DATA_MAX_TOKENS)
    * @param {string} model - Model name for token calculation
    * @returns {Promise<string|null>}
    */
-  async _validateAndTruncateExternalApiData(apiData, maxTokens = 500, model = undefined) {
+  async _validateAndTruncateExternalApiData(
+    apiData,
+    maxTokens = EXTERNAL_API_DATA_MAX_TOKENS,
+    model = undefined
+  ) {
     if (!apiData) {
       return null;
     }

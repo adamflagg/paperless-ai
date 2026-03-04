@@ -1,6 +1,7 @@
 const { truncateToTokenLimit } = require('./serviceUtils');
 const AzureOpenAI = require('openai').AzureOpenAI;
 const config = require('../config/config');
+const { GENERATE_TEXT_MAX_TOKENS, STATUS_CHECK_MAX_TOKENS } = require('../config/constants');
 const BaseAIService = require('./baseAIService');
 
 class AzureOpenAIService extends BaseAIService {
@@ -157,7 +158,7 @@ class AzureOpenAIService extends BaseAIService {
         model: model,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
-        max_tokens: 1000,
+        max_tokens: GENERATE_TEXT_MAX_TOKENS,
       });
 
       if (!response?.choices?.[0]?.message?.content) {
@@ -185,7 +186,7 @@ class AzureOpenAIService extends BaseAIService {
         model: model,
         messages: [{ role: 'user', content: 'Test' }],
         temperature: 0.7,
-        max_tokens: 10,
+        max_tokens: STATUS_CHECK_MAX_TOKENS,
       });
 
       if (!response?.choices?.[0]?.message?.content) {

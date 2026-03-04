@@ -1,6 +1,7 @@
 const fs = require('fs');
 const util = require('util');
 const path = require('path');
+const { MAX_LOG_FILE_SIZE } = require('../config/constants');
 
 class Logger {
   constructor(options = {}) {
@@ -8,7 +9,7 @@ class Logger {
     this.logDir = options.logDir || 'logs';
     this.timestamp = options.timestamp !== false;
     this.format = options.format || 'txt';
-    this.maxFileSize = options.maxFileSize || 1024 * 1024 * 10; // Standard: 10MB
+    this.maxFileSize = options.maxFileSize || MAX_LOG_FILE_SIZE;
 
     if (!fs.existsSync(this.logDir)) {
       fs.mkdirSync(this.logDir, { recursive: true });

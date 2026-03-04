@@ -1,6 +1,10 @@
 const { truncateToTokenLimit } = require('./serviceUtils');
 const OpenAI = require('openai');
 const config = require('../config/config');
+const {
+  CUSTOM_GENERATE_TEXT_MAX_TOKENS,
+  GENERATE_TEXT_MAX_TOKENS,
+} = require('../config/constants');
 const BaseAIService = require('./baseAIService');
 
 class CustomOpenAIService extends BaseAIService {
@@ -154,7 +158,7 @@ class CustomOpenAIService extends BaseAIService {
         model: model,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
-        max_tokens: 128000,
+        max_tokens: CUSTOM_GENERATE_TEXT_MAX_TOKENS,
       });
 
       if (!response?.choices?.[0]?.message?.content) {
@@ -182,7 +186,7 @@ class CustomOpenAIService extends BaseAIService {
         model: model,
         messages: [{ role: 'user', content: 'Ping' }],
         temperature: 0.7,
-        max_tokens: 1000,
+        max_tokens: GENERATE_TEXT_MAX_TOKENS,
       });
 
       if (!response?.choices?.[0]?.message?.content) {
