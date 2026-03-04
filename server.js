@@ -477,6 +477,7 @@ async function scanDocuments() {
 // Routes
 app.use('/', setupRoutes);
 app.use('/', require('./routes/debug'));
+app.use('/', require('./routes/manual'));
 require('./routes/auth');
 const ragRoutes = require('./routes/rag');
 
