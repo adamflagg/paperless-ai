@@ -1,0 +1,154 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  commit-lint:
+    runs-on: ubuntu-latest
+    if: github.actor != 'dependabot[bot]'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Validate commits
+        run: npx commitlint --from ${{ github.event.pull_request.base.sha || 'HEAD~1' }} --to HEAD
+
+  pr-title-lint:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      docker: ${{ steps.filter.outputs.docker }}
+      ci: ${{ steps.filter.outputs.ci }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'server.js'
+              - 'services/**'
+              - 'routes/**'
+              - 'config/**'
+              - 'models/**'
+              - 'middleware/**'
+              - 'schemas.js'
+              - 'package.json'
+              - 'package-lock.json'
+            frontend:
+              - 'public/**'
+              - 'views/**'
+            docker:
+              - 'Dockerfile*'
+              - 'docker-compose*.yml'
+              - 'start-services.sh'
+            ci:
+              - '.github/workflows/**'
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  lint:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.frontend == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: ESLint
+        run: npx eslint . --max-warnings 0
+      - name: Prettier
+        run: npx prettier --check '**/*.{js,json,md,yml,yaml}' --ignore-unknown
+      - name: npm audit
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+  test:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run tests
+        run: npx vitest run --coverage --reporter=verbose
+
+  docker-lint:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.docker == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Hadolint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+      - name: Hadolint Dockerfile.rag
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile.rag
+        continue-on-error: true
+
+  ci-summary:
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [commit-lint, lint, test, docker-lint, secret-scan]
+    steps:
+      - name: Check job results
+        run: |
+          echo "commit-lint: ${{ needs.commit-lint.result }}"
+          echo "lint: ${{ needs.lint.result }}"
+          echo "test: ${{ needs.test.result }}"
+          echo "docker-lint: ${{ needs.docker-lint.result }}"
+          echo "secret-scan: ${{ needs.secret-scan.result }}"
+
+          for result in \
+            "${{ needs.commit-lint.result }}" \
+            "${{ needs.lint.result }}" \
+            "${{ needs.test.result }}" \
+            "${{ needs.docker-lint.result }}" \
+            "${{ needs.secret-scan.result }}"; do
+            if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then
+              echo "FAILED: A required job did not succeed."
+              exit 1
+            fi
+          done
+          echo "All required checks passed or were skipped."
