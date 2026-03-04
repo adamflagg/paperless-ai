@@ -1,23 +1,23 @@
 /**
- * Behavior tests for shared AI service logic.
+ * Behavior tests for shared AI service logic via BaseAIService.
  *
- * These tests capture the CURRENT duplicated behavior across all 5 AI services
- * (openaiService, geminiService, azureService, customService, ollamaService).
+ * Tests the REAL extracted methods in services/baseAIService.js:
+ *   1. buildCustomFieldsTemplate()  — CUSTOM_FIELDS env -> prompt string
+ *   2. parseAIResponse(rawText)     — strip markdown fences, JSON.parse
+ *   3. validateAIResponse(parsed)   — tags array + correspondent string check
+ *   4. buildSystemPrompt(...)       — config flags -> prompt assembly
+ *   5. calculateTokenBudget(...)    — token budget calculation
+ *   6. buildErrorResult() / buildSuccessResult() — return shape standardization
+ *   7. mapOpenAIUsage() / mapGeminiUsage()       — usage metric mapping
+ *   8. getPlaygroundMustHavePrompt()              — playground prompt
  *
- * The three shared patterns tested here are:
- *   1. Custom fields template generation (CUSTOM_FIELDS env -> prompt string)
- *   2. AI response parsing (strip markdown fences, JSON.parse, validate structure)
- *   3. System prompt construction (config flags -> prompt assembly)
- *
- * Since the logic currently lives as inline code inside each service's
- * analyzeDocument method (not extracted into testable functions), we replicate
- * the exact algorithms here as standalone functions and test those. When
- * Task 2.2 extracts a baseAIService, these tests will be pointed at the
- * real extracted functions and should still pass, verifying the refactor
- * preserved behavior.
+ * Uses createRequire() to obtain the same CJS module instances that
+ * baseAIService.js uses internally, ensuring config mutations and
+ * serviceUtils calls are on the shared singleton objects.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { createRequire } from 'module';
 import {
   sampleCustomFields,
   emptyCustomFields,
@@ -35,166 +35,110 @@ import {
 } from '../../fixtures/analyzeDocument.fixtures.js';
 
 // ---------------------------------------------------------------------------
-// 1. Custom Fields Template Generation
-//
-// This is the exact algorithm copied from all 5 services. Each service does:
-//   - JSON.parse(process.env.CUSTOM_FIELDS)
-//   - iterate .custom_fields with forEach((field, index) => ...)
-//   - build { [index]: { field_name: field.value, value: 'Fill in...' } }
-//   - stringify with indent, prepend '"custom_fields": ', indent each line
-//
-// This function replicates that pattern for isolated testing.
+// Use createRequire to get the SAME CJS module instances that
+// baseAIService.js uses internally via require().
+// This ensures config mutations and spies on serviceUtils propagate
+// to the code under test.
 // ---------------------------------------------------------------------------
-
-function buildCustomFieldsTemplate(customFieldsJson) {
-  let customFieldsObj;
-  try {
-    customFieldsObj = JSON.parse(customFieldsJson);
-  } catch {
-    customFieldsObj = { custom_fields: [] };
-  }
-
-  const customFieldsTemplate = {};
-
-  customFieldsObj.custom_fields.forEach((field, index) => {
-    customFieldsTemplate[index] = {
-      field_name: field.value,
-      value: 'Fill in the value based on your analysis',
-    };
-  });
-
-  const customFieldsStr =
-    '"custom_fields": ' +
-    JSON.stringify(customFieldsTemplate, null, 2)
-      .split('\n')
-      .map((line) => '    ' + line)
-      .join('\n');
-
-  return customFieldsStr;
-}
-
-// ---------------------------------------------------------------------------
-// 2. AI Response Parsing
-//
-// All services (except Ollama, which has its own _processOllamaResponse) do:
-//   - Strip ```json\n? and ```\n? markers
-//   - .trim()
-//   - JSON.parse
-//   - Validate: parsedResponse must exist, .tags must be an Array,
-//     .correspondent must be a string
-// ---------------------------------------------------------------------------
-
-function parseAIResponse(rawText) {
-  let jsonContent = rawText
-    .replace(/```json\n?/g, '')
-    .replace(/```\n?/g, '')
-    .trim();
-
-  const parsed = JSON.parse(jsonContent);
-  return parsed;
-}
-
-function validateAIResponse(parsed) {
-  if (!parsed || !Array.isArray(parsed.tags) || typeof parsed.correspondent !== 'string') {
-    throw new Error('Invalid response structure: missing tags array or correspondent string');
-  }
-  return parsed;
-}
-
-// ---------------------------------------------------------------------------
-// 3. System Prompt Construction
-//
-// All services use the same branching logic:
-//   if (useExistingData === 'yes' && restrictTags === 'no' && restrictCorrespondents === 'no')
-//     -> prepend existing data + SYSTEM_PROMPT + mustHavePrompt
-//   else
-//     -> SYSTEM_PROMPT + mustHavePrompt
-//
-// Then optionally override if USE_PROMPT_TAGS === 'yes' or customPrompt is provided.
-// ---------------------------------------------------------------------------
-
-function buildSystemPrompt({
-  useExistingData,
-  restrictToExistingTags,
-  restrictToExistingCorrespondents,
-  existingTags,
-  existingCorrespondentList,
-  existingDocumentTypesList,
-  systemPromptEnv,
-  mustHavePrompt,
-  customFieldsStr,
-  customPrompt,
-  usePromptTags,
-  specialPromptPreDefinedTags,
-}) {
-  let systemPrompt = '';
-
-  // Replace %CUSTOMFIELDS% in mustHavePrompt
-  const mustHaveWithFields = mustHavePrompt.replace('%CUSTOMFIELDS%', customFieldsStr);
-
-  if (
-    useExistingData === 'yes' &&
-    restrictToExistingTags === 'no' &&
-    restrictToExistingCorrespondents === 'no'
-  ) {
-    const existingTagsList = existingTags.join(', ');
-    systemPrompt =
-      `
-        Pre-existing tags: ${existingTagsList}\n\n
-        Pre-existing correspondents: ${existingCorrespondentList}\n\n
-        Pre-existing document types: ${existingDocumentTypesList.join(', ')}\n\n
-        ` +
-      systemPromptEnv +
-      '\n\n' +
-      mustHaveWithFields;
-  } else {
-    systemPrompt = systemPromptEnv + '\n\n' + mustHaveWithFields;
-  }
-
-  // USE_PROMPT_TAGS overrides the entire prompt
-  if (usePromptTags === 'yes') {
-    systemPrompt =
-      `
-        Take these tags and try to match one or more to the document content.\n\n
-        ` + specialPromptPreDefinedTags;
-  }
-
-  // customPrompt overrides the entire prompt (applied after USE_PROMPT_TAGS)
-  if (customPrompt) {
-    systemPrompt = customPrompt + '\n\n' + mustHaveWithFields;
-  }
-
-  return systemPrompt;
-}
+const require = createRequire(import.meta.url);
+const BaseAIService = require('../../../services/baseAIService');
+const config = require('../../../config/config');
 
 // ===========================================================================
 // TESTS
 // ===========================================================================
 
-describe('AI Service Shared Logic', () => {
+describe('BaseAIService — Shared Logic', () => {
+  /** @type {InstanceType<typeof BaseAIService>} */
+  let service;
+  let savedEnv;
+  let savedConfig;
+
+  beforeEach(() => {
+    service = new BaseAIService('test-provider');
+
+    // Save env vars we will manipulate
+    savedEnv = {
+      CUSTOM_FIELDS: process.env.CUSTOM_FIELDS,
+      SYSTEM_PROMPT: process.env.SYSTEM_PROMPT,
+      USE_PROMPT_TAGS: process.env.USE_PROMPT_TAGS,
+      PROMPT_TAGS: process.env.PROMPT_TAGS,
+    };
+
+    // Save config values we will manipulate
+    savedConfig = {
+      useExistingData: config.useExistingData,
+      restrictToExistingTags: config.restrictToExistingTags,
+      restrictToExistingCorrespondents: config.restrictToExistingCorrespondents,
+      tokenLimit: config.tokenLimit,
+      responseTokens: config.responseTokens,
+      mustHavePrompt: config.mustHavePrompt,
+      specialPromptPreDefinedTags: config.specialPromptPreDefinedTags,
+    };
+
+    // Set sensible defaults for env vars
+    process.env.CUSTOM_FIELDS = sampleCustomFields;
+    process.env.SYSTEM_PROMPT = 'You are a document analyzer.';
+    process.env.USE_PROMPT_TAGS = 'no';
+    process.env.PROMPT_TAGS = '';
+
+    // Set config to known state
+    config.useExistingData = 'no';
+    config.restrictToExistingTags = 'no';
+    config.restrictToExistingCorrespondents = 'no';
+    config.tokenLimit = '128000';
+    config.responseTokens = '1000';
+    config.mustHavePrompt = mustHavePromptTemplate;
+    config.specialPromptPreDefinedTags = 'Special predefined tags prompt';
+  });
+
+  afterEach(() => {
+    // Restore env vars
+    for (const [key, val] of Object.entries(savedEnv)) {
+      if (val === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = val;
+      }
+    }
+
+    // Restore config values
+    for (const [key, val] of Object.entries(savedConfig)) {
+      config[key] = val;
+    }
+
+    vi.restoreAllMocks();
+  });
+
   // =========================================================================
-  // Custom Fields Template Generation
+  // Constructor
+  // =========================================================================
+  describe('constructor', () => {
+    it('should store the provider name', () => {
+      expect(service.providerName).toBe('test-provider');
+    });
+
+    it('should initialize client to null', () => {
+      expect(service.client).toBeNull();
+    });
+  });
+
+  // =========================================================================
+  // buildCustomFieldsTemplate
   // =========================================================================
   describe('buildCustomFieldsTemplate', () => {
     it('should generate indexed template from custom fields config', () => {
-      const result = buildCustomFieldsTemplate(sampleCustomFields);
+      const result = service.buildCustomFieldsTemplate();
 
-      // Should start with "custom_fields":
       expect(result).toContain('"custom_fields":');
-
-      // Should contain both field names from fixtures
       expect(result).toContain('"field_name": "amount"');
       expect(result).toContain('"field_name": "due_date"');
-
-      // Should contain placeholder values
       expect(result).toContain('"value": "Fill in the value based on your analysis"');
     });
 
     it('should use numeric index keys (0, 1, ...) not field names', () => {
-      const result = buildCustomFieldsTemplate(sampleCustomFields);
+      const result = service.buildCustomFieldsTemplate();
 
-      // The outer object uses numeric string keys "0", "1" etc.
-      // Parse the JSON portion to verify
       const jsonPart = result.replace('"custom_fields": ', '').replace(/^ {4}/gm, '');
       const parsed = JSON.parse(jsonPart);
 
@@ -205,7 +149,8 @@ describe('AI Service Shared Logic', () => {
     });
 
     it('should return empty object for empty custom_fields array', () => {
-      const result = buildCustomFieldsTemplate(emptyCustomFields);
+      process.env.CUSTOM_FIELDS = emptyCustomFields;
+      const result = service.buildCustomFieldsTemplate();
 
       expect(result).toContain('"custom_fields":');
       const jsonPart = result.replace('"custom_fields": ', '').replace(/^ {4}/gm, '');
@@ -215,7 +160,8 @@ describe('AI Service Shared Logic', () => {
     });
 
     it('should handle invalid JSON gracefully (fallback to empty)', () => {
-      const result = buildCustomFieldsTemplate('not valid json');
+      process.env.CUSTOM_FIELDS = 'not valid json';
+      const result = service.buildCustomFieldsTemplate();
 
       expect(result).toContain('"custom_fields":');
       const jsonPart = result.replace('"custom_fields": ', '').replace(/^ {4}/gm, '');
@@ -224,8 +170,9 @@ describe('AI Service Shared Logic', () => {
       expect(Object.keys(parsed)).toHaveLength(0);
     });
 
-    it('should handle undefined input gracefully', () => {
-      const result = buildCustomFieldsTemplate(undefined);
+    it('should handle undefined CUSTOM_FIELDS gracefully', () => {
+      delete process.env.CUSTOM_FIELDS;
+      const result = service.buildCustomFieldsTemplate();
 
       expect(result).toContain('"custom_fields":');
       const jsonPart = result.replace('"custom_fields": ', '').replace(/^ {4}/gm, '');
@@ -235,24 +182,21 @@ describe('AI Service Shared Logic', () => {
     });
 
     it('should indent JSON lines with 4 spaces (first line has prefix)', () => {
-      const result = buildCustomFieldsTemplate(sampleCustomFields);
+      const result = service.buildCustomFieldsTemplate();
       const lines = result.split('\n');
 
-      // First line has the "custom_fields": prefix prepended, so it starts with "
       expect(lines[0]).toMatch(/^"custom_fields":/);
 
-      // All subsequent lines should start with at least 4 spaces
-      // (the indentation added by .map(line => '    ' + line))
       for (let i = 1; i < lines.length; i++) {
         expect(lines[i].startsWith('    ')).toBe(true);
       }
     });
 
     it('should handle single custom field', () => {
-      const singleField = JSON.stringify({
+      process.env.CUSTOM_FIELDS = JSON.stringify({
         custom_fields: [{ value: 'vendor_name', data_type: 'string' }],
       });
-      const result = buildCustomFieldsTemplate(singleField);
+      const result = service.buildCustomFieldsTemplate();
 
       const jsonPart = result.replace('"custom_fields": ', '').replace(/^ {4}/gm, '');
       const parsed = JSON.parse(jsonPart);
@@ -263,11 +207,11 @@ describe('AI Service Shared Logic', () => {
   });
 
   // =========================================================================
-  // AI Response Parsing
+  // parseAIResponse
   // =========================================================================
   describe('parseAIResponse', () => {
     it('should parse raw JSON response', () => {
-      const result = parseAIResponse(sampleAIResponseRawJSON);
+      const result = service.parseAIResponse(sampleAIResponseRawJSON);
 
       expect(result.title).toBe('Acme Corp Invoice $500');
       expect(result.tags).toEqual(['invoice', 'acme']);
@@ -277,7 +221,7 @@ describe('AI Service Shared Logic', () => {
     });
 
     it('should strip ```json fences and parse', () => {
-      const result = parseAIResponse(sampleAIResponseWrappedInMarkdown);
+      const result = service.parseAIResponse(sampleAIResponseWrappedInMarkdown);
 
       expect(result.title).toBe('Acme Corp Invoice $500');
       expect(result.tags).toEqual(['invoice', 'acme']);
@@ -285,7 +229,7 @@ describe('AI Service Shared Logic', () => {
     });
 
     it('should strip plain ``` fences (no language tag) and parse', () => {
-      const result = parseAIResponse(sampleAIResponseWrappedInBackticks);
+      const result = service.parseAIResponse(sampleAIResponseWrappedInBackticks);
 
       expect(result.title).toBe('Acme Corp Invoice $500');
       expect(result.correspondent).toBe('Acme Corp');
@@ -293,81 +237,90 @@ describe('AI Service Shared Logic', () => {
 
     it('should handle JSON with leading/trailing whitespace', () => {
       const padded = '   \n\n' + sampleAIResponseRawJSON + '\n\n   ';
-      const result = parseAIResponse(padded);
+      const result = service.parseAIResponse(padded);
 
       expect(result.title).toBe('Acme Corp Invoice $500');
     });
 
     it('should handle ```json without trailing newline', () => {
       const noNewline = '```json' + JSON.stringify(sampleAIResponse) + '```';
-      const result = parseAIResponse(noNewline);
+      const result = service.parseAIResponse(noNewline);
 
       expect(result.title).toBe('Acme Corp Invoice $500');
     });
 
     it('should throw on completely unparseable text', () => {
-      expect(() => parseAIResponse(unparsableResponse)).toThrow();
+      expect(() => service.parseAIResponse(unparsableResponse)).toThrow(
+        'Invalid JSON response from API'
+      );
     });
 
-    it('should handle nested ```json fences (only strips outermost)', () => {
-      // The regex replaces ALL occurrences of ```json and ```, so even nested ones
-      // get stripped. This test documents that current behavior.
+    it('should handle nested ```json fences (strips all occurrences)', () => {
       const nested = '```json\n{"title": "test", "tags": ["a"], "correspondent": "B"}\n```';
-      const result = parseAIResponse(nested);
+      const result = service.parseAIResponse(nested);
       expect(result.title).toBe('test');
+    });
+
+    it('should return a valid object after parsing', () => {
+      const result = service.parseAIResponse(sampleAIResponseRawJSON);
+
+      // Verify the parsed result has all expected fields
+      expect(result).toHaveProperty('title');
+      expect(result).toHaveProperty('tags');
+      expect(result).toHaveProperty('correspondent');
+      expect(result).toHaveProperty('document_type');
+      expect(result).toHaveProperty('document_date');
+      expect(result).toHaveProperty('language');
     });
   });
 
   // =========================================================================
-  // AI Response Validation
+  // validateAIResponse
   // =========================================================================
   describe('validateAIResponse', () => {
     it('should accept valid response with tags array and correspondent string', () => {
-      const result = validateAIResponse(sampleAIResponse);
-      expect(result).toBe(sampleAIResponse);
+      expect(() => service.validateAIResponse(sampleAIResponse)).not.toThrow();
     });
 
     it('should throw when tags is missing', () => {
       const noTags = { title: 'Test', correspondent: 'Someone' };
-      expect(() => validateAIResponse(noTags)).toThrow(
+      expect(() => service.validateAIResponse(noTags)).toThrow(
         'Invalid response structure: missing tags array or correspondent string'
       );
     });
 
     it('should throw when tags is not an array', () => {
       const badTags = { tags: 'not-array', correspondent: 'Someone' };
-      expect(() => validateAIResponse(badTags)).toThrow(
+      expect(() => service.validateAIResponse(badTags)).toThrow(
         'Invalid response structure: missing tags array or correspondent string'
       );
     });
 
     it('should throw when correspondent is not a string', () => {
       const parsed = JSON.parse(invalidAIResponseBadCorrespondent);
-      expect(() => validateAIResponse(parsed)).toThrow(
+      expect(() => service.validateAIResponse(parsed)).toThrow(
         'Invalid response structure: missing tags array or correspondent string'
       );
     });
 
     it('should throw when response is null', () => {
-      expect(() => validateAIResponse(null)).toThrow(
+      expect(() => service.validateAIResponse(null)).toThrow(
         'Invalid response structure: missing tags array or correspondent string'
       );
     });
 
     it('should throw when response is undefined', () => {
-      expect(() => validateAIResponse(undefined)).toThrow(
+      expect(() => service.validateAIResponse(undefined)).toThrow(
         'Invalid response structure: missing tags array or correspondent string'
       );
     });
 
     it('should accept response with empty tags array', () => {
       const emptyTags = { tags: [], correspondent: 'Someone' };
-      const result = validateAIResponse(emptyTags);
-      expect(result.tags).toEqual([]);
+      expect(() => service.validateAIResponse(emptyTags)).not.toThrow();
     });
 
     it('should accept response with extra fields (title, document_type, etc.)', () => {
-      // Validation only checks tags and correspondent; extra fields are fine
       const withExtras = {
         tags: ['a'],
         correspondent: 'B',
@@ -375,169 +328,484 @@ describe('AI Service Shared Logic', () => {
         document_type: 'Invoice',
         custom_fields: [],
       };
-      expect(() => validateAIResponse(withExtras)).not.toThrow();
+      expect(() => service.validateAIResponse(withExtras)).not.toThrow();
     });
   });
 
   // =========================================================================
-  // System Prompt Construction
+  // buildSystemPrompt
   // =========================================================================
   describe('buildSystemPrompt', () => {
-    const defaultArgs = {
-      useExistingData: 'no',
-      restrictToExistingTags: 'no',
-      restrictToExistingCorrespondents: 'no',
-      existingTags: sampleExistingTags,
-      existingCorrespondentList: sampleCorrespondents,
-      existingDocumentTypesList: sampleDocumentTypes,
-      systemPromptEnv: 'You are a document analyzer.',
-      mustHavePrompt: mustHavePromptTemplate,
-      customFieldsStr: '"custom_fields": {}',
-      customPrompt: null,
-      usePromptTags: 'no',
-      specialPromptPreDefinedTags: '',
-    };
-
     it('should use SYSTEM_PROMPT + mustHavePrompt when useExistingData is "no"', () => {
-      const result = buildSystemPrompt(defaultArgs);
+      const { systemPrompt } = service.buildSystemPrompt(
+        sampleExistingTags,
+        sampleCorrespondents,
+        sampleDocumentTypes,
+        null,
+        null
+      );
 
-      expect(result).toContain('You are a document analyzer.');
-      expect(result).toContain('Return the result EXCLUSIVELY as a JSON object');
-      // Should NOT contain pre-existing data section
-      expect(result).not.toContain('Pre-existing tags:');
+      expect(systemPrompt).toContain('You are a document analyzer.');
+      expect(systemPrompt).toContain('Return the result EXCLUSIVELY as a JSON object');
+      expect(systemPrompt).not.toContain('Pre-existing tags:');
     });
 
     it('should prepend existing data when useExistingData is "yes" and no restrictions', () => {
-      const result = buildSystemPrompt({
-        ...defaultArgs,
-        useExistingData: 'yes',
-      });
+      config.useExistingData = 'yes';
 
-      expect(result).toContain('Pre-existing tags: invoice, acme, finance');
-      expect(result).toContain('Pre-existing correspondents:');
-      expect(result).toContain('Pre-existing document types: Invoice, Receipt, Contract');
-      expect(result).toContain('You are a document analyzer.');
-      expect(result).toContain('Return the result EXCLUSIVELY as a JSON object');
+      const { systemPrompt } = service.buildSystemPrompt(
+        sampleExistingTags,
+        sampleCorrespondents,
+        sampleDocumentTypes,
+        null,
+        null
+      );
+
+      expect(systemPrompt).toContain('Pre-existing tags: invoice, acme, finance');
+      expect(systemPrompt).toContain('Pre-existing correspondents:');
+      expect(systemPrompt).toContain('Pre-existing document types: Invoice, Receipt, Contract');
+      expect(systemPrompt).toContain('You are a document analyzer.');
+      expect(systemPrompt).toContain('Return the result EXCLUSIVELY as a JSON object');
     });
 
     it('should NOT prepend existing data when restrictToExistingTags is "yes"', () => {
-      const result = buildSystemPrompt({
-        ...defaultArgs,
-        useExistingData: 'yes',
-        restrictToExistingTags: 'yes',
-      });
+      config.useExistingData = 'yes';
+      config.restrictToExistingTags = 'yes';
 
-      // Falls into else branch: SYSTEM_PROMPT + mustHavePrompt (no existing data prefix)
-      expect(result).not.toContain('Pre-existing tags:');
-      expect(result).toContain('You are a document analyzer.');
+      const { systemPrompt } = service.buildSystemPrompt(
+        sampleExistingTags,
+        sampleCorrespondents,
+        sampleDocumentTypes,
+        null,
+        null
+      );
+
+      expect(systemPrompt).not.toContain('Pre-existing tags:');
+      expect(systemPrompt).toContain('You are a document analyzer.');
     });
 
     it('should NOT prepend existing data when restrictToExistingCorrespondents is "yes"', () => {
-      const result = buildSystemPrompt({
-        ...defaultArgs,
-        useExistingData: 'yes',
-        restrictToExistingCorrespondents: 'yes',
-      });
+      config.useExistingData = 'yes';
+      config.restrictToExistingCorrespondents = 'yes';
 
-      expect(result).not.toContain('Pre-existing tags:');
-      expect(result).toContain('You are a document analyzer.');
+      const { systemPrompt } = service.buildSystemPrompt(
+        sampleExistingTags,
+        sampleCorrespondents,
+        sampleDocumentTypes,
+        null,
+        null
+      );
+
+      expect(systemPrompt).not.toContain('Pre-existing tags:');
+      expect(systemPrompt).toContain('You are a document analyzer.');
     });
 
     it('should replace %CUSTOMFIELDS% placeholder in mustHavePrompt', () => {
-      const customFieldsStr = buildCustomFieldsTemplate(sampleCustomFields);
-      const result = buildSystemPrompt({
-        ...defaultArgs,
-        customFieldsStr,
-      });
+      const { systemPrompt } = service.buildSystemPrompt(
+        sampleExistingTags,
+        sampleCorrespondents,
+        sampleDocumentTypes,
+        null,
+        null
+      );
 
-      expect(result).not.toContain('%CUSTOMFIELDS%');
-      expect(result).toContain('"field_name": "amount"');
-      expect(result).toContain('"field_name": "due_date"');
+      expect(systemPrompt).not.toContain('%CUSTOMFIELDS%');
+      expect(systemPrompt).toContain('"field_name": "amount"');
+      expect(systemPrompt).toContain('"field_name": "due_date"');
     });
 
-    it('should override entire prompt when usePromptTags is "yes"', () => {
-      const specialPrompt = 'Special predefined tags prompt with tag list';
-      const result = buildSystemPrompt({
-        ...defaultArgs,
-        usePromptTags: 'yes',
-        specialPromptPreDefinedTags: specialPrompt,
-      });
+    it('should override entire prompt when USE_PROMPT_TAGS is "yes"', () => {
+      process.env.USE_PROMPT_TAGS = 'yes';
+      process.env.PROMPT_TAGS = 'tag1, tag2';
 
-      // The prompt tags override replaces everything
-      expect(result).toContain('Take these tags and try to match one or more');
-      expect(result).toContain(specialPrompt);
-      // SYSTEM_PROMPT should NOT be in the output
-      expect(result).not.toContain('You are a document analyzer.');
+      const { systemPrompt, promptTags } = service.buildSystemPrompt(
+        sampleExistingTags,
+        sampleCorrespondents,
+        sampleDocumentTypes,
+        null,
+        null
+      );
+
+      expect(systemPrompt).toContain('Take these tags and try to match one or more');
+      expect(systemPrompt).toContain('Special predefined tags prompt');
+      expect(systemPrompt).not.toContain('You are a document analyzer.');
+      expect(promptTags).toBe('tag1, tag2');
     });
 
     it('should override prompt when customPrompt is provided', () => {
-      const result = buildSystemPrompt({
-        ...defaultArgs,
-        customPrompt: 'Custom webhook prompt content',
-      });
+      const { systemPrompt } = service.buildSystemPrompt(
+        sampleExistingTags,
+        sampleCorrespondents,
+        sampleDocumentTypes,
+        'Custom webhook prompt content',
+        null
+      );
 
-      expect(result).toContain('Custom webhook prompt content');
-      expect(result).toContain('Return the result EXCLUSIVELY as a JSON object');
-      // Original SYSTEM_PROMPT should NOT be present
-      expect(result).not.toContain('You are a document analyzer.');
+      expect(systemPrompt).toContain('Custom webhook prompt content');
+      expect(systemPrompt).toContain('Return the result EXCLUSIVELY as a JSON object');
+      expect(systemPrompt).not.toContain('You are a document analyzer.');
     });
 
     it('should let customPrompt override usePromptTags (customPrompt applied last)', () => {
-      // In the actual services, customPrompt check comes AFTER usePromptTags,
-      // so customPrompt wins when both are set.
-      const result = buildSystemPrompt({
-        ...defaultArgs,
-        usePromptTags: 'yes',
-        specialPromptPreDefinedTags: 'Tag prompt override',
-        customPrompt: 'Webhook prompt wins',
-      });
+      process.env.USE_PROMPT_TAGS = 'yes';
+      config.specialPromptPreDefinedTags = 'Tag prompt override';
 
-      expect(result).toContain('Webhook prompt wins');
-      expect(result).not.toContain('Tag prompt override');
+      const { systemPrompt } = service.buildSystemPrompt(
+        sampleExistingTags,
+        sampleCorrespondents,
+        sampleDocumentTypes,
+        'Webhook prompt wins',
+        null
+      );
+
+      expect(systemPrompt).toContain('Webhook prompt wins');
+      expect(systemPrompt).not.toContain('Tag prompt override');
     });
 
     it('should include custom fields in prompt even with customPrompt override', () => {
-      const customFieldsStr = buildCustomFieldsTemplate(sampleCustomFields);
-      const result = buildSystemPrompt({
-        ...defaultArgs,
-        customPrompt: 'Webhook prompt',
-        customFieldsStr,
-      });
+      const { systemPrompt } = service.buildSystemPrompt(
+        sampleExistingTags,
+        sampleCorrespondents,
+        sampleDocumentTypes,
+        'Webhook prompt',
+        null
+      );
 
-      // customPrompt + mustHavePrompt (with custom fields) should be present
-      expect(result).toContain('Webhook prompt');
-      expect(result).toContain('"field_name": "amount"');
+      expect(systemPrompt).toContain('Webhook prompt');
+      expect(systemPrompt).toContain('"field_name": "amount"');
+    });
+
+    it('should append external API data when provided', () => {
+      const { systemPrompt } = service.buildSystemPrompt(
+        sampleExistingTags,
+        sampleCorrespondents,
+        sampleDocumentTypes,
+        null,
+        'External data: vendor=Acme'
+      );
+
+      expect(systemPrompt).toContain('Additional context from external API:');
+      expect(systemPrompt).toContain('External data: vendor=Acme');
+    });
+
+    it('should NOT append external API section when data is null', () => {
+      const { systemPrompt } = service.buildSystemPrompt(
+        sampleExistingTags,
+        sampleCorrespondents,
+        sampleDocumentTypes,
+        null,
+        null
+      );
+
+      expect(systemPrompt).not.toContain('Additional context from external API:');
     });
   });
 
   // =========================================================================
-  // End-to-end: parse + validate combined
+  // calculateTokenBudget
+  //
+  // Uses the real serviceUtils (character-based estimation for non-OpenAI
+  // models), plus spyOn for controlled tests.
+  // =========================================================================
+  describe('calculateTokenBudget', () => {
+    it('should return totalPromptTokens and availableTokens', async () => {
+      config.tokenLimit = '128000';
+      config.responseTokens = '1000';
+
+      const result = await service.calculateTokenBudget('short system prompt', '', 'llama3');
+
+      expect(result).toHaveProperty('totalPromptTokens');
+      expect(result).toHaveProperty('availableTokens');
+      expect(typeof result.totalPromptTokens).toBe('number');
+      expect(typeof result.availableTokens).toBe('number');
+      expect(result.totalPromptTokens).toBeGreaterThan(0);
+      expect(result.availableTokens).toBeGreaterThan(0);
+    });
+
+    it('should calculate available tokens as maxTokens minus reserved', async () => {
+      config.tokenLimit = '10000';
+      config.responseTokens = '500';
+
+      const result = await service.calculateTokenBudget('test prompt', '', 'llama3');
+
+      const expectedAvailable = 10000 - result.totalPromptTokens - 500;
+      expect(result.availableTokens).toBe(expectedAvailable);
+    });
+
+    it('should include promptTags in token count when USE_PROMPT_TAGS is "yes"', async () => {
+      config.tokenLimit = '128000';
+      config.responseTokens = '1000';
+      process.env.USE_PROMPT_TAGS = 'yes';
+
+      const resultWithTags = await service.calculateTokenBudget(
+        'system prompt',
+        'tag1, tag2, tag3, tag4, tag5',
+        'llama3'
+      );
+
+      process.env.USE_PROMPT_TAGS = 'no';
+
+      const resultWithoutTags = await service.calculateTokenBudget(
+        'system prompt',
+        'tag1, tag2, tag3, tag4, tag5',
+        'llama3'
+      );
+
+      // With tags, more tokens are used -> fewer available
+      expect(resultWithTags.totalPromptTokens).toBeGreaterThan(resultWithoutTags.totalPromptTokens);
+    });
+
+    it('should throw when token limit is too small for prompt', async () => {
+      config.tokenLimit = '10';
+      config.responseTokens = '5';
+
+      await expect(
+        service.calculateTokenBudget(
+          'This is a prompt that should exceed the tiny token limit easily when estimated',
+          '',
+          'llama3'
+        )
+      ).rejects.toThrow('Token limit exceeded');
+    });
+
+    it('should produce consistent budget across calls with same inputs', async () => {
+      config.tokenLimit = '50000';
+      config.responseTokens = '800';
+
+      const result1 = await service.calculateTokenBudget('same prompt', '', 'llama3');
+      const result2 = await service.calculateTokenBudget('same prompt', '', 'llama3');
+
+      expect(result1.totalPromptTokens).toBe(result2.totalPromptTokens);
+      expect(result1.availableTokens).toBe(result2.availableTokens);
+    });
+
+    it('should use more tokens for longer prompts', async () => {
+      config.tokenLimit = '128000';
+      config.responseTokens = '1000';
+
+      const shortResult = await service.calculateTokenBudget('short', '', 'llama3');
+      const longResult = await service.calculateTokenBudget(
+        'This is a much longer system prompt that contains many more words and tokens',
+        '',
+        'llama3'
+      );
+
+      expect(longResult.totalPromptTokens).toBeGreaterThan(shortResult.totalPromptTokens);
+      expect(longResult.availableTokens).toBeLessThan(shortResult.availableTokens);
+    });
+
+    it('should respect responseTokens reservation in budget', async () => {
+      config.tokenLimit = '10000';
+
+      config.responseTokens = '100';
+      const smallReserve = await service.calculateTokenBudget('test', '', 'llama3');
+
+      config.responseTokens = '5000';
+      const largeReserve = await service.calculateTokenBudget('test', '', 'llama3');
+
+      // Same prompt tokens but different available tokens due to responseTokens
+      expect(smallReserve.totalPromptTokens).toBe(largeReserve.totalPromptTokens);
+      expect(smallReserve.availableTokens).toBeGreaterThan(largeReserve.availableTokens);
+      expect(smallReserve.availableTokens - largeReserve.availableTokens).toBe(4900); // 5000 - 100
+    });
+  });
+
+  // =========================================================================
+  // buildErrorResult
+  // =========================================================================
+  describe('buildErrorResult', () => {
+    it('should return standard error shape with the given message', () => {
+      const result = service.buildErrorResult('Something went wrong');
+
+      expect(result).toEqual({
+        document: { tags: [], correspondent: null },
+        metrics: null,
+        error: 'Something went wrong',
+      });
+    });
+
+    it('should have empty tags array in document', () => {
+      const result = service.buildErrorResult('err');
+      expect(result.document.tags).toEqual([]);
+    });
+
+    it('should have null correspondent in document', () => {
+      const result = service.buildErrorResult('err');
+      expect(result.document.correspondent).toBeNull();
+    });
+
+    it('should have null metrics', () => {
+      const result = service.buildErrorResult('err');
+      expect(result.metrics).toBeNull();
+    });
+  });
+
+  // =========================================================================
+  // buildSuccessResult
+  // =========================================================================
+  describe('buildSuccessResult', () => {
+    it('should return standard success shape', () => {
+      const metrics = { promptTokens: 100, completionTokens: 50, totalTokens: 150 };
+      const result = service.buildSuccessResult(sampleAIResponse, metrics, false);
+
+      expect(result).toEqual({
+        document: sampleAIResponse,
+        metrics,
+        truncated: false,
+      });
+    });
+
+    it('should include the parsed response as document', () => {
+      const result = service.buildSuccessResult(sampleAIResponse, null, true);
+      expect(result.document).toBe(sampleAIResponse);
+    });
+
+    it('should pass through truncated flag', () => {
+      const result = service.buildSuccessResult({}, null, true);
+      expect(result.truncated).toBe(true);
+    });
+
+    it('should pass through metrics object', () => {
+      const metrics = { promptTokens: 10, completionTokens: 20, totalTokens: 30 };
+      const result = service.buildSuccessResult({}, metrics, false);
+      expect(result.metrics).toBe(metrics);
+    });
+  });
+
+  // =========================================================================
+  // mapOpenAIUsage
+  // =========================================================================
+  describe('mapOpenAIUsage', () => {
+    it('should map OpenAI-style snake_case to camelCase', () => {
+      const usage = { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 };
+      const result = service.mapOpenAIUsage(usage);
+
+      expect(result).toEqual({
+        promptTokens: 100,
+        completionTokens: 50,
+        totalTokens: 150,
+      });
+    });
+
+    it('should handle zero values', () => {
+      const usage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+      const result = service.mapOpenAIUsage(usage);
+
+      expect(result.promptTokens).toBe(0);
+      expect(result.completionTokens).toBe(0);
+      expect(result.totalTokens).toBe(0);
+    });
+  });
+
+  // =========================================================================
+  // mapGeminiUsage
+  // =========================================================================
+  describe('mapGeminiUsage', () => {
+    it('should map Gemini-style usage metadata to common format', () => {
+      const usage = { promptTokenCount: 200, candidatesTokenCount: 80, totalTokenCount: 280 };
+      const result = service.mapGeminiUsage(usage);
+
+      expect(result).toEqual({
+        promptTokens: 200,
+        completionTokens: 80,
+        totalTokens: 280,
+      });
+    });
+
+    it('should default to zeros when usageMetadata is undefined', () => {
+      const result = service.mapGeminiUsage(undefined);
+
+      expect(result).toEqual({
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+      });
+    });
+
+    it('should default to zeros when usageMetadata is null', () => {
+      const result = service.mapGeminiUsage(null);
+
+      expect(result).toEqual({
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+      });
+    });
+
+    it('should handle partial usage metadata (missing fields)', () => {
+      const result = service.mapGeminiUsage({ promptTokenCount: 100 });
+
+      expect(result.promptTokens).toBe(100);
+      expect(result.completionTokens).toBe(0);
+      expect(result.totalTokens).toBe(0);
+    });
+  });
+
+  // =========================================================================
+  // getPlaygroundMustHavePrompt
+  // =========================================================================
+  describe('getPlaygroundMustHavePrompt', () => {
+    it('should return a string containing JSON template instructions', () => {
+      const result = service.getPlaygroundMustHavePrompt();
+
+      expect(typeof result).toBe('string');
+      expect(result).toContain('Return the result EXCLUSIVELY as a JSON object');
+      expect(result).toContain('"title"');
+      expect(result).toContain('"correspondent"');
+      expect(result).toContain('"tags"');
+      expect(result).toContain('"document_date"');
+      expect(result).toContain('"language"');
+    });
+  });
+
+  // =========================================================================
+  // getModel (abstract method)
+  // =========================================================================
+  describe('getModel', () => {
+    it('should throw when not overridden by a subclass', () => {
+      expect(() => service.getModel()).toThrow('getModel() must be implemented by subclass');
+    });
+  });
+
+  // =========================================================================
+  // createTimestamp
+  // =========================================================================
+  describe('createTimestamp', () => {
+    it('should return a non-empty string', () => {
+      const result = service.createTimestamp();
+      expect(typeof result).toBe('string');
+      expect(result.length).toBeGreaterThan(0);
+    });
+  });
+
+  // =========================================================================
+  // End-to-end: parseAIResponse + validateAIResponse combined
   // =========================================================================
   describe('parseAIResponse + validateAIResponse (combined)', () => {
     it('should successfully parse and validate a markdown-wrapped response', () => {
-      const parsed = parseAIResponse(sampleAIResponseWrappedInMarkdown);
-      const validated = validateAIResponse(parsed);
+      const parsed = service.parseAIResponse(sampleAIResponseWrappedInMarkdown);
+      service.validateAIResponse(parsed);
 
-      expect(validated.title).toBe('Acme Corp Invoice $500');
-      expect(validated.tags).toEqual(['invoice', 'acme']);
-      expect(validated.correspondent).toBe('Acme Corp');
-      expect(validated.document_type).toBe('Invoice');
+      expect(parsed.title).toBe('Acme Corp Invoice $500');
+      expect(parsed.tags).toEqual(['invoice', 'acme']);
+      expect(parsed.correspondent).toBe('Acme Corp');
+      expect(parsed.document_type).toBe('Invoice');
     });
 
     it('should fail validation on response missing tags', () => {
-      const parsed = parseAIResponse(invalidAIResponseMissingTags);
-      expect(() => validateAIResponse(parsed)).toThrow('Invalid response structure');
+      const parsed = service.parseAIResponse(invalidAIResponseMissingTags);
+      expect(() => service.validateAIResponse(parsed)).toThrow('Invalid response structure');
     });
 
     it('should fail validation on response with non-string correspondent', () => {
-      const parsed = parseAIResponse(invalidAIResponseBadCorrespondent);
-      expect(() => validateAIResponse(parsed)).toThrow('Invalid response structure');
+      const parsed = service.parseAIResponse(invalidAIResponseBadCorrespondent);
+      expect(() => service.validateAIResponse(parsed)).toThrow('Invalid response structure');
     });
 
     it('should throw parse error on unparseable text', () => {
       expect(() => {
-        const parsed = parseAIResponse(unparsableResponse);
-        validateAIResponse(parsed);
+        const parsed = service.parseAIResponse(unparsableResponse);
+        service.validateAIResponse(parsed);
       }).toThrow();
     });
   });
@@ -547,75 +815,63 @@ describe('AI Service Shared Logic', () => {
   // =========================================================================
   describe('custom fields integration with prompt construction', () => {
     it('should produce a complete prompt with custom fields embedded', () => {
-      const customFieldsStr = buildCustomFieldsTemplate(sampleCustomFields);
-      const prompt = buildSystemPrompt({
-        useExistingData: 'yes',
-        restrictToExistingTags: 'no',
-        restrictToExistingCorrespondents: 'no',
-        existingTags: sampleExistingTags,
-        existingCorrespondentList: sampleCorrespondents,
-        existingDocumentTypesList: sampleDocumentTypes,
-        systemPromptEnv: 'Analyze this document.',
-        mustHavePrompt: mustHavePromptTemplate,
-        customFieldsStr,
-        customPrompt: null,
-        usePromptTags: 'no',
-        specialPromptPreDefinedTags: '',
-      });
+      config.useExistingData = 'yes';
+      process.env.SYSTEM_PROMPT = 'Analyze this document.';
 
-      // Should have pre-existing data
-      expect(prompt).toContain('Pre-existing tags: invoice, acme, finance');
+      const { systemPrompt } = service.buildSystemPrompt(
+        sampleExistingTags,
+        sampleCorrespondents,
+        sampleDocumentTypes,
+        null,
+        null
+      );
 
-      // Should have the system prompt
-      expect(prompt).toContain('Analyze this document.');
-
-      // Should have mustHavePrompt content
-      expect(prompt).toContain('Return the result EXCLUSIVELY as a JSON object');
-
-      // Should have custom fields (no leftover placeholder)
-      expect(prompt).not.toContain('%CUSTOMFIELDS%');
-      expect(prompt).toContain('"field_name": "amount"');
-      expect(prompt).toContain('"field_name": "due_date"');
-      expect(prompt).toContain('Fill in the value based on your analysis');
+      expect(systemPrompt).toContain('Pre-existing tags: invoice, acme, finance');
+      expect(systemPrompt).toContain('Analyze this document.');
+      expect(systemPrompt).toContain('Return the result EXCLUSIVELY as a JSON object');
+      expect(systemPrompt).not.toContain('%CUSTOMFIELDS%');
+      expect(systemPrompt).toContain('"field_name": "amount"');
+      expect(systemPrompt).toContain('"field_name": "due_date"');
+      expect(systemPrompt).toContain('Fill in the value based on your analysis');
     });
   });
 
   // =========================================================================
-  // Error return shape (all services return this on failure)
+  // Integration: buildErrorResult / buildSuccessResult with real parsed data
   // =========================================================================
-  describe('error return shape', () => {
-    it('should match the common error return format used by all services', () => {
-      // All services catch errors and return this shape:
-      const errorResult = {
-        document: { tags: [], correspondent: null },
-        metrics: null,
-        error: 'Some error message',
-      };
+  describe('error/success result integration', () => {
+    it('should produce a success result from parsed and validated AI response', () => {
+      const parsed = service.parseAIResponse(sampleAIResponseWrappedInMarkdown);
+      service.validateAIResponse(parsed);
 
-      expect(errorResult.document.tags).toEqual([]);
-      expect(errorResult.document.correspondent).toBeNull();
-      expect(errorResult.metrics).toBeNull();
-      expect(typeof errorResult.error).toBe('string');
+      const metrics = service.mapOpenAIUsage({
+        prompt_tokens: 100,
+        completion_tokens: 50,
+        total_tokens: 150,
+      });
+
+      const result = service.buildSuccessResult(parsed, metrics, false);
+
+      expect(result.document.tags).toBeInstanceOf(Array);
+      expect(typeof result.document.correspondent).toBe('string');
+      expect(result.metrics).toHaveProperty('promptTokens');
+      expect(result.metrics).toHaveProperty('completionTokens');
+      expect(result.metrics).toHaveProperty('totalTokens');
+      expect(result.truncated).toBe(false);
     });
 
-    it('should match the common success return format used by all services', () => {
-      // All services return this shape on success:
-      const successResult = {
-        document: sampleAIResponse,
-        metrics: {
-          promptTokens: 100,
-          completionTokens: 50,
-          totalTokens: 150,
-        },
-        truncated: false,
-      };
+    it('should produce an error result when parsing fails', () => {
+      let result;
+      try {
+        service.parseAIResponse(unparsableResponse);
+      } catch (err) {
+        result = service.buildErrorResult(err.message);
+      }
 
-      expect(successResult.document.tags).toBeInstanceOf(Array);
-      expect(typeof successResult.document.correspondent).toBe('string');
-      expect(successResult.metrics).toHaveProperty('promptTokens');
-      expect(successResult.metrics).toHaveProperty('completionTokens');
-      expect(successResult.metrics).toHaveProperty('totalTokens');
-      expect(typeof successResult.truncated).toBe('boolean');
+      expect(result.document.tags).toEqual([]);
+      expect(result.document.correspondent).toBeNull();
+      expect(result.metrics).toBeNull();
+      expect(typeof result.error).toBe('string');
     });
   });
 });
