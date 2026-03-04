@@ -236,4 +236,100 @@ describe('routes/auth.js', () => {
       expect(res.redirect).toHaveBeenCalledWith('/login');
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // JWT_SECRET ephemeral fallback
+  // ---------------------------------------------------------------------------
+
+  describe('JWT_SECRET ephemeral fallback', () => {
+    it('generates a random secret when JWT_SECRET env var is not set', () => {
+      // JWT_SECRET env var is not set in the test environment
+      delete process.env.JWT_SECRET;
+      // The module was already loaded without JWT_SECRET — verify it exported a truthy value
+      expect(JWT_SECRET).toBeTruthy();
+      expect(typeof JWT_SECRET).toBe('string');
+      // An ephemeral secret from crypto.randomBytes(64).toString('hex') is 128 hex chars
+      expect(JWT_SECRET.length).toBe(128);
+    });
+
+    it('logs a warning when JWT_SECRET env var is not set', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      delete process.env.JWT_SECRET;
+
+      // Re-require to trigger the module-level warning
+      // Clear the CJS cache so the module re-executes
+      const modulePath = require_.resolve('../../../routes/auth');
+      delete require_.cache[modulePath];
+      // Also clear cached middleware that imports auth
+      const authSetupPath = require_.resolve('../../../middleware/authSetup');
+      delete require_.cache[authSetupPath];
+
+      require_('../../../routes/auth');
+
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('JWT_SECRET not set'));
+
+      warnSpy.mockRestore();
+
+      // Restore the module for subsequent tests
+      delete require_.cache[modulePath];
+      delete require_.cache[authSetupPath];
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Timing-safe API key comparison
+  // ---------------------------------------------------------------------------
+
+  describe('timing-safe API key comparison', () => {
+    it('accepts a valid API key (same value)', () => {
+      const { req, res, next } = createMocks({
+        headers: { 'x-api-key': 'test-api-key-12345' },
+      });
+
+      authenticateJWT(req, res, next);
+
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(req.user).toEqual({ apiKey: true });
+    });
+
+    it('rejects a wrong API key of different length', () => {
+      const { req, res, next } = createMocks({
+        headers: { 'x-api-key': 'short' },
+      });
+
+      authenticateJWT(req, res, next);
+
+      expect(next).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(401);
+    });
+
+    it('rejects a wrong API key of same length', () => {
+      // 'test-api-key-12345' has 18 chars; craft a wrong key of the same length
+      const wrongKey = 'wrong-api-key-9999';
+      expect(wrongKey.length).toBe('test-api-key-12345'.length);
+
+      const { req, res, next } = createMocks({
+        headers: { 'x-api-key': wrongKey },
+      });
+
+      authenticateJWT(req, res, next);
+
+      expect(next).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(401);
+    });
+
+    it('rejects API key when API_KEY env var is not set', () => {
+      delete process.env.API_KEY;
+
+      const { req, res, next } = createMocks({
+        headers: { 'x-api-key': 'test-api-key-12345' },
+      });
+
+      authenticateJWT(req, res, next);
+
+      // Falls through to 401 (no JWT either)
+      expect(next).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(401);
+    });
+  });
 });

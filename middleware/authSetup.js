@@ -1,5 +1,17 @@
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { JWT_SECRET } = require('../routes/auth');
+
+/**
+ * Timing-safe comparison for two strings.
+ * Prevents timing attacks when validating API keys.
+ */
+function safeCompare(a, b) {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
 
 // Public paths that don't require authentication
 const PUBLIC_PATHS = [
@@ -28,7 +40,7 @@ function createAuthSetupMiddleware(setupService) {
     const token = req.cookies.jwt || req.headers.authorization?.split(' ')[1];
     const apiKey = req.headers['x-api-key'];
 
-    if (apiKey && apiKey === process.env.API_KEY) {
+    if (apiKey && process.env.API_KEY && safeCompare(apiKey, process.env.API_KEY)) {
       req.user = { apiKey: true };
     } else if (!token) {
       if (req.path.startsWith('/api/')) {
