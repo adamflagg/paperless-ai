@@ -4,12 +4,15 @@ const path = require('path');
 const { MAX_LOG_FILE_SIZE } = require('../config/constants');
 
 class Logger {
+  static LEVELS = { error: 0, warn: 1, info: 2, debug: 3 };
+
   constructor(options = {}) {
     this.logFile = options.logFile || 'application.log';
     this.logDir = options.logDir || 'logs';
     this.timestamp = options.timestamp !== false;
     this.format = options.format || 'txt';
     this.maxFileSize = options.maxFileSize || MAX_LOG_FILE_SIZE;
+    this.logLevel = Logger.LEVELS[process.env.LOG_LEVEL || 'info'] ?? Logger.LEVELS.info;
 
     if (!fs.existsSync(this.logDir)) {
       fs.mkdirSync(this.logDir, { recursive: true });
@@ -188,35 +191,49 @@ class Logger {
     fs.appendFileSync(this.logPath, message);
   }
 
+  shouldLog(level) {
+    return this.logLevel >= Logger.LEVELS[level];
+  }
+
   overrideConsoleMethods() {
     console.log = (...args) => {
-      const logMessage = this.formatLogMessage('info', args);
-      this.originalConsole.log(...args);
-      this.writeToFile(logMessage);
+      if (this.shouldLog('info')) {
+        const logMessage = this.formatLogMessage('info', args);
+        this.originalConsole.log(...args);
+        this.writeToFile(logMessage);
+      }
     };
 
     console.error = (...args) => {
-      const logMessage = this.formatLogMessage('error', args);
-      this.originalConsole.error(...args);
-      this.writeToFile(logMessage);
+      if (this.shouldLog('error')) {
+        const logMessage = this.formatLogMessage('error', args);
+        this.originalConsole.error(...args);
+        this.writeToFile(logMessage);
+      }
     };
 
     console.warn = (...args) => {
-      const logMessage = this.formatLogMessage('warn', args);
-      this.originalConsole.warn(...args);
-      this.writeToFile(logMessage);
+      if (this.shouldLog('warn')) {
+        const logMessage = this.formatLogMessage('warn', args);
+        this.originalConsole.warn(...args);
+        this.writeToFile(logMessage);
+      }
     };
 
     console.info = (...args) => {
-      const logMessage = this.formatLogMessage('info', args);
-      this.originalConsole.info(...args);
-      this.writeToFile(logMessage);
+      if (this.shouldLog('info')) {
+        const logMessage = this.formatLogMessage('info', args);
+        this.originalConsole.info(...args);
+        this.writeToFile(logMessage);
+      }
     };
 
     console.debug = (...args) => {
-      const logMessage = this.formatLogMessage('debug', args);
-      this.originalConsole.debug(...args);
-      this.writeToFile(logMessage);
+      if (this.shouldLog('debug')) {
+        const logMessage = this.formatLogMessage('debug', args);
+        this.originalConsole.debug(...args);
+        this.writeToFile(logMessage);
+      }
     };
   }
 
