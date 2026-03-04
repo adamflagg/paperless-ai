@@ -14,8 +14,10 @@ const setupRoutes = require('./routes/setup');
 // Add environment variables for RAG service if not already set
 process.env.RAG_SERVICE_URL = process.env.RAG_SERVICE_URL || 'http://localhost:8000';
 process.env.RAG_SERVICE_ENABLED = process.env.RAG_SERVICE_ENABLED || 'true';
+const helmet = require('helmet');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
+const rateLimit = require('express-rate-limit');
 const Logger = require('./services/loggerService');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
@@ -36,6 +38,12 @@ new Logger({
 
 const app = express();
 let runningTask = false;
+
+app.use(
+  helmet({
+    contentSecurityPolicy: false, // EJS templates use inline scripts
+  })
+);
 
 const allowedOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map((s) => s.trim())
@@ -150,6 +158,16 @@ app.set('views', path.join(__dirname, 'views'));
 
 // Centralized auth + setup check middleware (see middleware/authSetup.js)
 app.use(createAuthSetupMiddleware(setupService));
+
+// Rate limit login attempts
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5,
+  message: { error: 'Too many login attempts. Try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/login', loginLimiter);
 
 // Initialize data directory
 async function initializeDataDirectory() {
