@@ -479,6 +479,7 @@ app.use('/', setupRoutes);
 app.use('/', require('./routes/debug'));
 app.use('/', require('./routes/manual'));
 app.use('/', require('./routes/history'));
+app.use('/', require('./routes/dashboard'));
 require('./routes/auth');
 const ragRoutes = require('./routes/rag');
 
