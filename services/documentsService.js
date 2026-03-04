@@ -10,7 +10,7 @@ class DocumentsService {
   async getTagNames() {
     if (this.tagCache.size === 0) {
       const tags = await paperlessService.getTags();
-      tags.forEach(tag => {
+      tags.forEach((tag) => {
         this.tagCache.set(tag.id, tag.name);
       });
     }
@@ -20,7 +20,7 @@ class DocumentsService {
   async getCorrespondentNames() {
     if (this.correspondentCache.size === 0) {
       const correspondents = await paperlessService.listCorrespondentsNames();
-      correspondents.forEach(corr => {
+      correspondents.forEach((corr) => {
         this.correspondentCache.set(corr.id, corr.name);
       });
     }
@@ -31,7 +31,7 @@ class DocumentsService {
     const [documents, tagNames, correspondentNames] = await Promise.all([
       paperlessService.getDocuments(),
       this.getTagNames(),
-      this.getCorrespondentNames()
+      this.getCorrespondentNames(),
     ]);
 
     // Sort documents by created date (newest first)
@@ -41,7 +41,7 @@ class DocumentsService {
       documents,
       tagNames,
       correspondentNames,
-      paperlessUrl: process.env.PAPERLESS_API_URL.replace('/api', '')
+      paperlessUrl: process.env.PAPERLESS_API_URL.replace('/api', ''),
     };
   }
 }

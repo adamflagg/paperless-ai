@@ -3,6 +3,10 @@ const path = require('path');
 const axios = require('axios');
 const { OpenAI } = require('openai');
 const config = require('../config/config');
+const {
+  SETUP_VALIDATION_MAX_RETRIES,
+  SETUP_VALIDATION_INTERVAL_MS,
+} = require('../config/constants');
 const AzureOpenAI = require('openai').AzureOpenAI;
 const { GoogleGenAI } = require('@google/genai');
 
@@ -16,7 +20,7 @@ class SetupService {
     try {
       const envContent = await fs.readFile(this.envPath, 'utf8');
       const config = {};
-      envContent.split('\n').forEach(line => {
+      envContent.split('\n').forEach((line) => {
         const [key, value] = line.split('=');
         if (key && value) {
           config[key.trim()] = value.trim();
@@ -34,8 +38,8 @@ class SetupService {
       console.log('Validating Paperless config for:', url + '/api/documents/');
       const response = await axios.get(`${url}/api/documents/`, {
         headers: {
-          'Authorization': `Token ${token}`
-        }
+          Authorization: `Token ${token}`,
+        },
       });
       return response.status === 200;
     } catch (error) {
@@ -45,45 +49,57 @@ class SetupService {
   }
 
   async validateApiPermissions(url, token) {
-    for (const endpoint of ['correspondents', 'tags', 'documents', 'document_types', 'custom_fields', 'users']) {
+    for (const endpoint of [
+      'correspondents',
+      'tags',
+      'documents',
+      'document_types',
+      'custom_fields',
+      'users',
+    ]) {
       try {
         console.log(`Validating API permissions for ${url}/api/${endpoint}/`);
         const response = await axios.get(`${url}/api/${endpoint}/`, {
           headers: {
-            'Authorization': `Token ${token}`
-          }
+            Authorization: `Token ${token}`,
+          },
         });
         console.log(`API permissions validated for ${endpoint}, ${response.status}`);
         if (response.status !== 200) {
           console.error(`API permissions validation failed for ${endpoint}`);
-          return { success: false, message: `API permissions validation failed for endpoint '/api/${endpoint}/'` };
+          return {
+            success: false,
+            message: `API permissions validation failed for endpoint '/api/${endpoint}/'`,
+          };
         }
       } catch (error) {
         console.error(`API permissions validation failed for ${endpoint}:`, error.message);
-        return { success: false, message: `API permissions validation failed for endpoint '/api/${endpoint}/'` };
+        return {
+          success: false,
+          message: `API permissions validation failed for endpoint '/api/${endpoint}/'`,
+        };
       }
     }
     return { success: true, message: 'API permissions validated successfully' };
-}
-
+  }
 
   async validateOpenAIConfig(apiKey) {
     if (config.CONFIGURED === false) {
       try {
         const openai = new OpenAI({ apiKey });
         const response = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
-          messages: [{ role: "user", content: "Test" }],
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'user', content: 'Test' }],
         });
         const now = new Date();
         const timestamp = now.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
-        console.log(`[DEBUG] [${timestamp}] OpenAI request sent`);
+        console.debug(`[${timestamp}] OpenAI request sent`);
         return response.choices && response.choices.length > 0;
       } catch (error) {
         console.error('OpenAI validation error:', error.message);
         return false;
       }
-    }else{
+    } else {
       return true;
     }
   }
@@ -92,16 +108,16 @@ class SetupService {
     const config = {
       baseURL: url,
       apiKey: apiKey,
-      model: model
+      model: model,
     };
-    console.log('Custom AI config:', config);
+    console.debug('Custom AI config:', config);
     try {
-      const openai = new OpenAI({ 
-        apiKey: config.apiKey, 
+      const openai = new OpenAI({
+        apiKey: config.apiKey,
         baseURL: config.baseURL,
       });
       const completion = await openai.chat.completions.create({
-        messages: [{ role: "user", content: "Test" }],
+        messages: [{ role: 'user', content: 'Test' }],
         model: config.model,
       });
       return completion.choices && completion.choices.length > 0;
@@ -111,14 +127,12 @@ class SetupService {
     }
   }
 
-
-
   async validateOllamaConfig(url, model) {
     try {
       const response = await axios.post(`${url}/api/generate`, {
         model: model || 'llama3.2',
         prompt: 'Test',
-        stream: false
+        stream: false,
       });
       return response.data && response.data.response;
     } catch (error) {
@@ -128,26 +142,28 @@ class SetupService {
   }
 
   async validateAzureConfig(apiKey, endpoint, deploymentName, apiVersion) {
-    console.log('Endpoint: ', endpoint);
+    console.debug('Endpoint:', endpoint);
     if (config.CONFIGURED === false) {
       try {
-        const openai = new AzureOpenAI({ apiKey: apiKey,
-                endpoint: endpoint,
-                deploymentName: deploymentName,
-                apiVersion: apiVersion });
+        const openai = new AzureOpenAI({
+          apiKey: apiKey,
+          endpoint: endpoint,
+          deploymentName: deploymentName,
+          apiVersion: apiVersion,
+        });
         const response = await openai.chat.completions.create({
           model: deploymentName,
-          messages: [{ role: "user", content: "Test" }],
+          messages: [{ role: 'user', content: 'Test' }],
         });
         const now = new Date();
         const timestamp = now.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
-        console.log(`[DEBUG] [${timestamp}] OpenAI request sent`);
+        console.debug(`[${timestamp}] OpenAI request sent`);
         return response.choices && response.choices.length > 0;
       } catch (error) {
         console.error('OpenAI validation error:', error.message);
         return false;
       }
-    }else{
+    } else {
       return true;
     }
   }
@@ -162,7 +178,7 @@ class SetupService {
         });
         const now = new Date();
         const timestamp = now.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
-        console.log(`[DEBUG] [${timestamp}] Gemini request sent`);
+        console.debug(`[${timestamp}] Gemini request sent`);
         return !!response.text;
       } catch (error) {
         console.error('Gemini validation error:', error.message);
@@ -180,7 +196,7 @@ class SetupService {
       paperlessApiUrl,
       config.PAPERLESS_API_TOKEN
     );
-    
+
     if (!paperlessValid) {
       throw new Error('Invalid Paperless configuration');
     }
@@ -189,7 +205,7 @@ class SetupService {
     const aiProvider = config.AI_PROVIDER || 'openai';
 
     console.log('AI provider:', aiProvider);
-    
+
     if (aiProvider === 'openai') {
       const openaiValid = await this.validateOpenAIConfig(config.OPENAI_API_KEY);
       if (!openaiValid) {
@@ -232,7 +248,6 @@ class SetupService {
       }
     }
 
-
     return true;
   }
 
@@ -241,24 +256,13 @@ class SetupService {
       // Validate the new configuration before saving
       await this.validateConfig(config);
 
-      const JSON_STANDARD_PROMPT = `
-        Return the result EXCLUSIVELY as a JSON object. The Tags and Title MUST be in the language that is used in the document.:
-        
-        {
-          "title": "xxxxx",
-          "correspondent": "xxxxxxxx",
-          "tags": ["Tag1", "Tag2", "Tag3", "Tag4"],
-          "document_date": "YYYY-MM-DD",
-          "language": "en/de/es/..."
-        }`;
-
       // Ensure data directory exists
       const dataDir = path.dirname(this.envPath);
       await fs.mkdir(dataDir, { recursive: true });
 
       const envContent = Object.entries(config)
         .map(([key, value]) => {
-          if (key === "SYSTEM_PROMPT") {
+          if (key === 'SYSTEM_PROMPT') {
             return `${key}=\`${value}\n\``;
           }
           return `${key}=${value}`;
@@ -266,7 +270,7 @@ class SetupService {
         .join('\n');
 
       await fs.writeFile(this.envPath, envContent);
-      
+
       // Reload environment variables
       Object.entries(config).forEach(([key, value]) => {
         process.env[key] = value;
@@ -282,8 +286,8 @@ class SetupService {
       return this.configured;
     }
 
-    const maxAttempts = 60; // 5 minutes = 300 seconds, attempting every 5 seconds = 60 attempts
-    const delayBetweenAttempts = 5000; // 5 seconds in milliseconds
+    const maxAttempts = SETUP_VALIDATION_MAX_RETRIES;
+    const delayBetweenAttempts = SETUP_VALIDATION_INTERVAL_MS;
     let attempts = 0;
 
     // First check if .env exists and if PAPERLESS_API_URL is set
@@ -291,7 +295,7 @@ class SetupService {
       // Check if .env file exists
       try {
         await fs.access(this.envPath, fs.constants.F_OK);
-      } catch (err) {
+      } catch (_err) {
         console.log('No .env file found. Starting setup process...');
         this.configured = false;
         return false;
@@ -316,7 +320,7 @@ class SetupService {
         const dataDir = path.dirname(this.envPath);
         try {
           await fs.access(dataDir, fs.constants.F_OK);
-        } catch (err) {
+        } catch (_err) {
           console.log('Creating data directory...');
           await fs.mkdir(dataDir, { recursive: true });
         }
@@ -349,7 +353,7 @@ class SetupService {
           return false;
         }
         console.log(`Retrying configuration (attempt ${attempts}/${maxAttempts}) in 5 seconds...`);
-        await new Promise(resolve => setTimeout(resolve, delayBetweenAttempts));
+        await new Promise((resolve) => setTimeout(resolve, delayBetweenAttempts));
       }
     }
 

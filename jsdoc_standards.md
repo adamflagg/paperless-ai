@@ -42,6 +42,7 @@ router.method('/path/to/endpoint', async (req, res) => {
   - For complex endpoints, include usage examples or explanations of how the endpoint works in the larger application context
 
 Example:
+
 ```javascript
 /**
  * @swagger
@@ -52,7 +53,7 @@ Example:
  *       Detailed explanation of the endpoint functionality.
  *       This should cover what the endpoint does, how it works,
  *       and any important behaviors users should know about.
- *       
+ *
  *       Use multiple paragraphs for complex explanations.
  */
 ```
@@ -72,6 +73,7 @@ Example:
 ### 3.2 Defined Tags
 
 The application uses the following tags for categorization:
+
 - Authentication - User authentication and authorization endpoints
 - Documents - Document management and processing endpoints
 - History - Document processing history and tracking
@@ -94,6 +96,7 @@ The application uses the following tags for categorization:
 ### 4.2 Security Requirement Format
 
 Security requirements should be specified in the standard format:
+
 ```javascript
  *     security:
  *       - BearerAuth: []
@@ -110,6 +113,7 @@ Security requirements should be specified in the standard format:
 ### 5.1 Path Parameters
 
 Path parameters should be documented with:
+
 - Parameter name matching the path definition
 - Schema type (integer, string, etc.)
 - Required flag (almost always true for path parameters)
@@ -130,6 +134,7 @@ Path parameters should be documented with:
 ### 5.2 Query Parameters
 
 Query parameters follow a similar format but include:
+
 - Default values where applicable
 - Enumerated values if the parameter has a restricted set of options
 
@@ -146,6 +151,7 @@ Query parameters follow a similar format but include:
 ### 5.3 Request Body
 
 For POST/PUT endpoints, document the request body with:
+
 - Required flag
 - Content type (usually application/json)
 - Schema definition including:
@@ -175,6 +181,7 @@ For POST/PUT endpoints, document the request body with:
 ### 6.1 Response Status Codes
 
 Each endpoint must document all possible response status codes:
+
 - 200/201 for successful operations
 - 400 for invalid requests
 - 401 for authentication failures
@@ -186,6 +193,7 @@ Each endpoint must document all possible response status codes:
 ### 6.2 Response Content
 
 For each status code, document:
+
 - Description of what the status code means in this specific context
 - Content type of the response
 - Schema definition of the response body
@@ -204,6 +212,7 @@ For each status code, document:
 ### 6.3 Streaming Responses
 
 For streaming endpoints (like chat), document:
+
 - The streaming nature of the response
 - The format of each chunk
 - Examples of the stream events
@@ -218,7 +227,7 @@ For streaming endpoints (like chat), document:
  *               type: string
  *               example: |
  *                 data: {"chunk":"Example response chunk"}
- *                 
+ *
  *                 data: {"done":true}
 ```
 
@@ -289,6 +298,7 @@ Arrays should specify the item type, either as a reference or inline schema:
 ### 9.1 Page Routes (Navigation)
 
 For routes that render HTML pages:
+
 - Tag with [Navigation] and relevant feature tag
 - Document the purpose of the page
 - Note any data dependencies
@@ -296,6 +306,7 @@ For routes that render HTML pages:
 ### 9.2 API Data Endpoints
 
 For pure data API endpoints:
+
 - Tag with [API] and relevant feature tag
 - Document the data structure comprehensively
 - Include pagination details if applicable
@@ -303,6 +314,7 @@ For pure data API endpoints:
 ### 9.3 Authentication Endpoints
 
 For authentication-related endpoints:
+
 - Tag with [Authentication]
 - Include detailed security considerations
 - Document token/session behaviors
@@ -328,4 +340,3 @@ For authentication-related endpoints:
 - Terminology should be consistent across all endpoints
 
 This comprehensive standard ensures that all API documentation in the Paperless-AI application is thorough, consistent, and user-friendly, providing developers with all the information they need to use the API effectively.
-

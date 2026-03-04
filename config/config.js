@@ -1,13 +1,15 @@
 const path = require('path');
 const currentDir = decodeURIComponent(process.cwd());
 const envPath = path.join(currentDir, 'data', '.env');
-console.log('Loading .env from:', envPath); // Debug log
+console.debug('Loading .env from:', envPath); // Debug log
 require('dotenv').config({ path: envPath });
 
 // Helper function to parse boolean-like env vars
 const parseEnvBoolean = (value, defaultValue = 'yes') => {
   if (!value) return defaultValue;
-  return value.toLowerCase() === 'true' || value === '1' || value.toLowerCase() === 'yes' ? 'yes' : 'no';
+  return value.toLowerCase() === 'true' || value === '1' || value.toLowerCase() === 'yes'
+    ? 'yes'
+    : 'no';
 };
 
 // Initialize limit functions with defaults
@@ -16,20 +18,26 @@ const limitFunctions = {
   activateCorrespondents: parseEnvBoolean(process.env.ACTIVATE_CORRESPONDENTS, 'yes'),
   activateDocumentType: parseEnvBoolean(process.env.ACTIVATE_DOCUMENT_TYPE, 'yes'),
   activateTitle: parseEnvBoolean(process.env.ACTIVATE_TITLE, 'yes'),
-  activateCustomFields: parseEnvBoolean(process.env.ACTIVATE_CUSTOM_FIELDS, 'yes')
+  activateCustomFields: parseEnvBoolean(process.env.ACTIVATE_CUSTOM_FIELDS, 'yes'),
 };
 
 // Initialize AI restrictions with defaults
 const aiRestrictions = {
   restrictToExistingTags: parseEnvBoolean(process.env.RESTRICT_TO_EXISTING_TAGS, 'no'),
-  restrictToExistingCorrespondents: parseEnvBoolean(process.env.RESTRICT_TO_EXISTING_CORRESPONDENTS, 'no'),
-  restrictToExistingDocumentTypes: parseEnvBoolean(process.env.RESTRICT_TO_EXISTING_DOCUMENT_TYPES, 'no')
+  restrictToExistingCorrespondents: parseEnvBoolean(
+    process.env.RESTRICT_TO_EXISTING_CORRESPONDENTS,
+    'no'
+  ),
+  restrictToExistingDocumentTypes: parseEnvBoolean(
+    process.env.RESTRICT_TO_EXISTING_DOCUMENT_TYPES,
+    'no'
+  ),
 };
 
 console.log('Loaded restriction settings:', {
   RESTRICT_TO_EXISTING_TAGS: aiRestrictions.restrictToExistingTags,
   RESTRICT_TO_EXISTING_CORRESPONDENTS: aiRestrictions.restrictToExistingCorrespondents,
-  RESTRICT_TO_EXISTING_DOCUMENT_TYPES: aiRestrictions.restrictToExistingDocumentTypes
+  RESTRICT_TO_EXISTING_DOCUMENT_TYPES: aiRestrictions.restrictToExistingDocumentTypes,
 });
 
 // Initialize external API configuration
@@ -40,20 +48,48 @@ const externalApiConfig = {
   headers: process.env.EXTERNAL_API_HEADERS || '{}',
   body: process.env.EXTERNAL_API_BODY || '{}',
   timeout: parseInt(process.env.EXTERNAL_API_TIMEOUT || '5000', 10),
-  transformationTemplate: process.env.EXTERNAL_API_TRANSFORM || ''
+  transformationTemplate: process.env.EXTERNAL_API_TRANSFORM || '',
 };
 
-console.log('Loaded environment variables:', {
+console.debug('Loaded environment variables:', {
   PAPERLESS_API_URL: process.env.PAPERLESS_API_URL,
   PAPERLESS_API_TOKEN: '******',
   LIMIT_FUNCTIONS: limitFunctions,
   AI_RESTRICTIONS: aiRestrictions,
-  EXTERNAL_API: externalApiConfig.enabled === 'yes' ? 'enabled' : 'disabled'
+  EXTERNAL_API: externalApiConfig.enabled === 'yes' ? 'enabled' : 'disabled',
 });
 
 module.exports = {
   PAPERLESS_AI_VERSION: '3.0.9',
   CONFIGURED: false,
+
+  // Server config
+  port: parseInt(process.env.PAPERLESS_AI_PORT || '3000', 10),
+  get nodeEnv() {
+    return process.env.NODE_ENV || 'development';
+  },
+  logLevel: process.env.LOG_LEVEL || 'info',
+
+  // Security config — getters so tests that mutate process.env still work
+  get jwtSecret() {
+    return process.env.JWT_SECRET;
+  },
+  get apiKey() {
+    return process.env.API_KEY;
+  },
+
+  // CORS config
+  corsOrigins: process.env.CORS_ORIGINS,
+
+  // RAG config
+  ragServiceUrl: process.env.RAG_SERVICE_URL || 'http://localhost:8000',
+  ragServiceEnabled: process.env.RAG_SERVICE_ENABLED || 'true',
+
+  // Initial setup flag
+  get initialSetup() {
+    return process.env.PAPERLESS_AI_INITIAL_SETUP;
+  },
+
   disableAutomaticProcessing: process.env.DISABLE_AUTOMATIC_PROCESSING || 'no',
   predefinedMode: process.env.PROCESS_PREDEFINED_DOCUMENTS,
   tokenLimit: process.env.TOKEN_LIMIT || 128000,
@@ -68,29 +104,29 @@ module.exports = {
   externalApiConfig: externalApiConfig,
   paperless: {
     apiUrl: process.env.PAPERLESS_API_URL,
-    apiToken: process.env.PAPERLESS_API_TOKEN
+    apiToken: process.env.PAPERLESS_API_TOKEN,
   },
   openai: {
-    apiKey: process.env.OPENAI_API_KEY
+    apiKey: process.env.OPENAI_API_KEY,
   },
   ollama: {
     apiUrl: process.env.OLLAMA_API_URL || 'http://localhost:11434',
-    model: process.env.OLLAMA_MODEL || 'llama3.2'
+    model: process.env.OLLAMA_MODEL || 'llama3.2',
   },
   custom: {
     apiUrl: process.env.CUSTOM_BASE_URL || '',
     apiKey: process.env.CUSTOM_API_KEY || '',
-    model: process.env.CUSTOM_MODEL || ''
+    model: process.env.CUSTOM_MODEL || '',
   },
   azure: {
     apiKey: process.env.AZURE_API_KEY || '',
     endpoint: process.env.AZURE_ENDPOINT || '',
     deploymentName: process.env.AZURE_DEPLOYMENT_NAME || '',
-    apiVersion: process.env.AZURE_API_VERSION || '2023-05-15'
+    apiVersion: process.env.AZURE_API_VERSION || '2023-05-15',
   },
   gemini: {
     apiKey: process.env.GEMINI_API_KEY || '',
-    model: process.env.GEMINI_MODEL || 'gemini-2.0-flash'
+    model: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
   },
   customFields: process.env.CUSTOM_FIELDS || '',
   aiProvider: process.env.AI_PROVIDER || 'openai',
@@ -102,7 +138,7 @@ module.exports = {
     activateCorrespondents: limitFunctions.activateCorrespondents,
     activateDocumentType: limitFunctions.activateDocumentType,
     activateTitle: limitFunctions.activateTitle,
-    activateCustomFields: limitFunctions.activateCustomFields
+    activateCustomFields: limitFunctions.activateCustomFields,
   },
   specialPromptPreDefinedTags: `You are a document analysis AI. You will analyze the document. 
   You take the main information to associate tags with the document. 

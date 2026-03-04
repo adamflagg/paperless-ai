@@ -1,0 +1,9 @@
+node_modules/
+data/
+public/images/
+*.min.js
+coverage/
+dist/
+logs/
+chromadb/
+__pycache__/

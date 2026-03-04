@@ -1,7 +1,6 @@
 // services/chatService.js
 const OpenAIService = require('./openaiService');
 const PaperlessService = require('./paperlessService');
-const config = require('../config/config');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -14,7 +13,7 @@ class ChatService {
   constructor() {
     this.chats = new Map(); // Stores chat histories: documentId -> messages[]
     this.tempDir = path.join(os.tmpdir(), 'paperless-chat');
-    
+
     // Create temporary directory if it doesn't exist
     if (!fs.existsSync(this.tempDir)) {
       fs.mkdirSync(this.tempDir, { recursive: true });
@@ -30,22 +29,19 @@ class ChatService {
     try {
       const document = await PaperlessService.getDocument(documentId);
       const tempFilePath = path.join(this.tempDir, `${documentId}_${document.original_filename}`);
-      
+
       // Create download stream
       const response = await PaperlessService.client.get(`/documents/${documentId}/download/`, {
-        responseType: 'stream'
+        responseType: 'stream',
       });
 
       // Save file temporarily
-      await pipeline(
-        response.data,
-        fs.createWriteStream(tempFilePath)
-      );
+      await pipeline(response.data, fs.createWriteStream(tempFilePath));
 
       return {
         filePath: tempFilePath,
         filename: document.original_filename,
-        mimeType: document.mime_type
+        mimeType: document.mime_type,
       };
     } catch (error) {
       console.error(`Error downloading document ${documentId}:`, error);
@@ -74,24 +70,24 @@ class ChatService {
       // Create initial system prompt
       const messages = [
         {
-          role: "system",
+          role: 'system',
           content: `You are a helpful assistant for the document "${document.title}". 
                    Use the following document content as context for your responses. 
                    If you don't know something or it's not in the document, please say so honestly.
                    
                    Document content:
-                   ${documentContent}`
-        }
+                   ${documentContent}`,
+        },
       ];
-      
+
       this.chats.set(documentId, {
         messages,
-        documentTitle: document.title
+        documentTitle: document.title,
       });
-      
+
       return {
         documentTitle: document.title,
-        initialized: true
+        initialized: true,
       };
     } catch (error) {
       console.error(`Error initializing chat for document ${documentId}:`, error);
@@ -107,8 +103,8 @@ class ChatService {
 
       const chatData = this.chats.get(documentId);
       chatData.messages.push({
-        role: "user",
-        content: userMessage
+        role: 'user',
+        content: userMessage,
       });
 
       // Set headers for SSE
@@ -122,18 +118,18 @@ class ChatService {
       if (aiProvider === 'openai') {
         // Make sure OpenAIService is initialized
         OpenAIService.initialize();
-        
+
         // Always create a new client instance for this request to ensure it works
         const openai = new OpenAI({
-          apiKey: process.env.OPENAI_API_KEY
+          apiKey: process.env.OPENAI_API_KEY,
         });
-        
+
         const stream = await openai.chat.completions.create({
           model: process.env.OPENAI_MODEL || 'gpt-4',
           messages: chatData.messages,
           stream: true,
         });
-        
+
         for await (const chunk of stream) {
           const content = chunk.choices[0]?.delta?.content || '';
           if (content) {
@@ -153,7 +149,7 @@ class ChatService {
           messages: chatData.messages,
           stream: true,
         });
-        
+
         for await (const chunk of stream) {
           const content = chunk.choices[0]?.delta?.content || '';
           if (content) {
@@ -174,7 +170,7 @@ class ChatService {
           messages: chatData.messages,
           stream: true,
         });
-        
+
         for await (const chunk of stream) {
           const content = chunk.choices[0]?.delta?.content || '';
           if (content) {
@@ -207,12 +203,14 @@ class ChatService {
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
         // Extract system message and build history for Gemini
-        const systemMessage = chatData.messages.find(m => m.role === 'system');
-        const historyMessages = chatData.messages.filter(m => m.role !== 'system' && m !== chatData.messages[chatData.messages.length - 1]);
+        const systemMessage = chatData.messages.find((m) => m.role === 'system');
+        const historyMessages = chatData.messages.filter(
+          (m) => m.role !== 'system' && m !== chatData.messages[chatData.messages.length - 1]
+        );
 
-        const geminiHistory = historyMessages.map(m => ({
+        const geminiHistory = historyMessages.map((m) => ({
           role: m.role === 'assistant' ? 'model' : m.role,
-          parts: [{ text: m.content }]
+          parts: [{ text: m.content }],
         }));
 
         const chat = ai.chats.create({
@@ -240,15 +238,14 @@ class ChatService {
 
       // Add the complete response to chat history
       chatData.messages.push({
-        role: "assistant",
-        content: fullResponse
+        role: 'assistant',
+        content: fullResponse,
       });
       this.chats.set(documentId, chatData);
 
       // End the stream
       res.write('data: [DONE]\n\n');
       res.end();
-
     } catch (error) {
       console.error(`Error in sendMessageStream:`, error);
       res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);

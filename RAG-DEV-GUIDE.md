@@ -71,18 +71,21 @@ The `--initialize` flag will build the document index on startup.
 1. Set the environment variables for the Node.js application:
 
 For Windows (Command Prompt):
+
 ```cmd
 set RAG_SERVICE_URL=http://localhost:8000
 set RAG_SERVICE_ENABLED=true
 ```
 
 For Windows (PowerShell):
+
 ```powershell
 $env:RAG_SERVICE_URL="http://localhost:8000"
 $env:RAG_SERVICE_ENABLED="true"
 ```
 
 For Linux/macOS:
+
 ```bash
 export RAG_SERVICE_URL=http://localhost:8000
 export RAG_SERVICE_ENABLED=true
@@ -109,6 +112,7 @@ You should see the RAG interface where you can ask questions about your document
 ### Environment Variables
 
 - The Python service looks for these variables in this order:
+
   - For API URL: `PAPERLESS_API_URL`, then `PAPERLESS_URL`, then `PAPERLESS_NGX_URL`, then `PAPERLESS_HOST`
   - For API Token: `PAPERLESS_TOKEN`, then `PAPERLESS_API_TOKEN`, then `PAPERLESS_APIKEY`
 
@@ -124,7 +128,8 @@ You should see the RAG interface where you can ask questions about your document
 
 When making changes to the codebase:
 
-1. **Python RAG Service Changes**: 
+1. **Python RAG Service Changes**:
+
    - Edit `main.py`
    - Restart the Python service to apply changes
 

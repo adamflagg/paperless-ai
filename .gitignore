@@ -26,6 +26,9 @@ indexed.conf
 indexing_complete.flag
 RAGZ_README.md
 
+# Test coverage output
+coverage/
+
 # Local development files
 .local/
 *.local.*

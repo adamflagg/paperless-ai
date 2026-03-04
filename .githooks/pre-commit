@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Warn if main is behind origin/main (adapted from kindred)
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [ "$BRANCH" = "main" ]; then
+  git fetch origin main --quiet 2>/dev/null || true
+  BEHIND=$(git rev-list --count HEAD..origin/main 2>/dev/null || echo "0")
+  if [ "$BEHIND" -gt 0 ]; then
+    echo "WARNING: main is $BEHIND commit(s) behind origin/main. Pull before committing."
+    echo "Run: git pull --rebase origin main"
+    exit 1
+  fi
+fi
+
+# Run prettier on staged files only
+STAGED_JS=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(js|json|md|yml|yaml)$' || true)
+if [ -n "$STAGED_JS" ]; then
+  echo "Running Prettier on staged files..."
+  echo "$STAGED_JS" | xargs npx prettier --check --ignore-unknown 2>/dev/null
+  if [ $? -ne 0 ]; then
+    echo ""
+    echo "Prettier check failed. Run: npm run format"
+    exit 1
+  fi
+fi
+
+echo "Pre-commit checks passed."

@@ -1,62 +1,66 @@
 const fs = require('fs');
 const util = require('util');
 const path = require('path');
+const { MAX_LOG_FILE_SIZE } = require('../config/constants');
 
 class Logger {
-    constructor(options = {}) {
-        this.logFile = options.logFile || 'application.log';
-        this.logDir = options.logDir || 'logs';
-        this.timestamp = options.timestamp !== false;
-        this.format = options.format || 'txt';
-        this.maxFileSize = options.maxFileSize || 1024 * 1024 * 10; // Standard: 10MB
-        
-        if (!fs.existsSync(this.logDir)) {
-            fs.mkdirSync(this.logDir, { recursive: true });
-        }
+  static LEVELS = { error: 0, warn: 1, info: 2, debug: 3 };
 
-        this.logPath = path.join(this.logDir, this.logFile);
-        
-        // Initialisiere Log-Datei
-        this.initLogFile();
+  constructor(options = {}) {
+    this.logFile = options.logFile || 'application.log';
+    this.logDir = options.logDir || 'logs';
+    this.timestamp = options.timestamp !== false;
+    this.format = options.format || 'txt';
+    this.maxFileSize = options.maxFileSize || MAX_LOG_FILE_SIZE;
+    this.logLevel = Logger.LEVELS[process.env.LOG_LEVEL || 'info'] ?? Logger.LEVELS.info;
 
-        this.originalConsole = {
-            log: console.log,
-            error: console.error,
-            warn: console.warn,
-            info: console.info,
-            debug: console.debug
-        };
-
-        this.overrideConsoleMethods();
+    if (!fs.existsSync(this.logDir)) {
+      fs.mkdirSync(this.logDir, { recursive: true });
     }
 
-    initLogFile() {
-        // Prüfe ob die Datei die maximale Größe überschreitet
-        if (this.checkFileSize()) {
-            // Lösche die alte Datei
-            try {
-                fs.unlinkSync(this.logPath);
-            } catch (error) {
-                // Ignoriere Fehler wenn Datei nicht existiert
-            }
-        }
+    this.logPath = path.join(this.logDir, this.logFile);
 
-        // Initialisiere HTML-Datei wenn nötig
-        if (this.format === 'html') {
-            this.initHtmlFile();
-        }
+    // Initialisiere Log-Datei
+    this.initLogFile();
+
+    this.originalConsole = {
+      log: console.log,
+      error: console.error,
+      warn: console.warn,
+      info: console.info,
+      debug: console.debug,
+    };
+
+    this.overrideConsoleMethods();
+  }
+
+  initLogFile() {
+    // Prüfe ob die Datei die maximale Größe überschreitet
+    if (this.checkFileSize()) {
+      // Lösche die alte Datei
+      try {
+        fs.unlinkSync(this.logPath);
+      } catch (_error) {
+        // Ignoriere Fehler wenn Datei nicht existiert
+      }
     }
 
-    checkFileSize() {
-        if (fs.existsSync(this.logPath)) {
-            const stats = fs.statSync(this.logPath);
-            return stats.size >= this.maxFileSize;
-        }
-        return false;
+    // Initialisiere HTML-Datei wenn nötig
+    if (this.format === 'html') {
+      this.initHtmlFile();
     }
+  }
 
-    initHtmlFile() {
-        const htmlHeader = `
+  checkFileSize() {
+    if (fs.existsSync(this.logPath)) {
+      const stats = fs.statSync(this.logPath);
+      return stats.size >= this.maxFileSize;
+    }
+    return false;
+  }
+
+  initHtmlFile() {
+    const htmlHeader = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -133,109 +137,124 @@ class Logger {
 <body>
     <div class="log-container">
 `;
-        
-        if (!fs.existsSync(this.logPath) || fs.statSync(this.logPath).size === 0) {
-            fs.writeFileSync(this.logPath, htmlHeader);
-        }
-    }
 
-    getTimestamp() {
-        return new Date().toISOString();
+    if (!fs.existsSync(this.logPath) || fs.statSync(this.logPath).size === 0) {
+      fs.writeFileSync(this.logPath, htmlHeader);
     }
+  }
 
-    formatLogMessage(type, args) {
-        const msg = util.format(...args);
-        if (this.format === 'html') {
-            const timestamp = this.timestamp ? 
-                `<span class="timestamp">[${this.getTimestamp()}]</span>` : '';
-            return `    <div class="log-entry">
+  getTimestamp() {
+    return new Date().toISOString();
+  }
+
+  formatLogMessage(type, args) {
+    const msg = util.format(...args);
+    if (this.format === 'html') {
+      const timestamp = this.timestamp
+        ? `<span class="timestamp">[${this.getTimestamp()}]</span>`
+        : '';
+      return `    <div class="log-entry">
         ${timestamp}
         <span class="type type-${type}">[${type.toUpperCase()}]</span>
         <span class="message">${this.escapeHtml(msg)}</span>
     </div>\n`;
-        } else {
-            return this.timestamp ? 
-                `[${this.getTimestamp()}] [${type.toUpperCase()}] ${msg}\n` :
-                `[${type.toUpperCase()}] ${msg}\n`;
-        }
+    } else {
+      return this.timestamp
+        ? `[${this.getTimestamp()}] [${type.toUpperCase()}] ${msg}\n`
+        : `[${type.toUpperCase()}] ${msg}\n`;
+    }
+  }
+
+  escapeHtml(unsafe) {
+    return unsafe
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;')
+      .replace(/\n/g, '<br>')
+      .replace(/\s/g, '&nbsp;');
+  }
+
+  writeToFile(message) {
+    // Prüfe Dateigröße vor dem Schreiben
+    if (this.checkFileSize()) {
+      // Lösche die alte Datei
+      fs.unlinkSync(this.logPath);
+
+      // Bei HTML-Format müssen wir den Header neu schreiben
+      if (this.format === 'html') {
+        this.initHtmlFile();
+      }
     }
 
-    escapeHtml(unsafe) {
-        return unsafe
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;")
-            .replace(/\n/g, "<br>")
-            .replace(/\s/g, "&nbsp;");
-    }
+    fs.appendFileSync(this.logPath, message);
+  }
 
-    writeToFile(message) {
-        // Prüfe Dateigröße vor dem Schreiben
-        if (this.checkFileSize()) {
-            // Lösche die alte Datei
-            fs.unlinkSync(this.logPath);
-            
-            // Bei HTML-Format müssen wir den Header neu schreiben
-            if (this.format === 'html') {
-                this.initHtmlFile();
-            }
-        }
-        
-        fs.appendFileSync(this.logPath, message);
-    }
+  shouldLog(level) {
+    return this.logLevel >= Logger.LEVELS[level];
+  }
 
-    overrideConsoleMethods() {
-        console.log = (...args) => {
-            const logMessage = this.formatLogMessage('info', args);
-            this.originalConsole.log(...args);
-            this.writeToFile(logMessage);
-        };
+  overrideConsoleMethods() {
+    console.log = (...args) => {
+      if (this.shouldLog('info')) {
+        const logMessage = this.formatLogMessage('info', args);
+        this.originalConsole.log(...args);
+        this.writeToFile(logMessage);
+      }
+    };
 
-        console.error = (...args) => {
-            const logMessage = this.formatLogMessage('error', args);
-            this.originalConsole.error(...args);
-            this.writeToFile(logMessage);
-        };
+    console.error = (...args) => {
+      if (this.shouldLog('error')) {
+        const logMessage = this.formatLogMessage('error', args);
+        this.originalConsole.error(...args);
+        this.writeToFile(logMessage);
+      }
+    };
 
-        console.warn = (...args) => {
-            const logMessage = this.formatLogMessage('warn', args);
-            this.originalConsole.warn(...args);
-            this.writeToFile(logMessage);
-        };
+    console.warn = (...args) => {
+      if (this.shouldLog('warn')) {
+        const logMessage = this.formatLogMessage('warn', args);
+        this.originalConsole.warn(...args);
+        this.writeToFile(logMessage);
+      }
+    };
 
-        console.info = (...args) => {
-            const logMessage = this.formatLogMessage('info', args);
-            this.originalConsole.info(...args);
-            this.writeToFile(logMessage);
-        };
+    console.info = (...args) => {
+      if (this.shouldLog('info')) {
+        const logMessage = this.formatLogMessage('info', args);
+        this.originalConsole.info(...args);
+        this.writeToFile(logMessage);
+      }
+    };
 
-        console.debug = (...args) => {
-            const logMessage = this.formatLogMessage('debug', args);
-            this.originalConsole.debug(...args);
-            this.writeToFile(logMessage);
-        };
-    }
+    console.debug = (...args) => {
+      if (this.shouldLog('debug')) {
+        const logMessage = this.formatLogMessage('debug', args);
+        this.originalConsole.debug(...args);
+        this.writeToFile(logMessage);
+      }
+    };
+  }
 
-    closeHtmlFile() {
-        if (this.format === 'html') {
-            const htmlFooter = `    </div>
+  closeHtmlFile() {
+    if (this.format === 'html') {
+      const htmlFooter = `    </div>
     <button class="auto-scroll" id="autoScrollBtn" onclick="toggleAutoScroll()">
         Auto-Scroll: ON
     </button>
 </body>
 </html>`;
-            this.writeToFile(htmlFooter);
-        }
+      this.writeToFile(htmlFooter);
     }
+  }
 
-    restore() {
-        Object.assign(console, this.originalConsole);
-        if (this.format === 'html') {
-            this.closeHtmlFile();
-        }
+  restore() {
+    Object.assign(console, this.originalConsole);
+    if (this.format === 'html') {
+      this.closeHtmlFile();
     }
+  }
 }
 
 module.exports = Logger;

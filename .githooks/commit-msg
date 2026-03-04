@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Skip merge commits, reverts, fixups
+MSG=$(cat "$1")
+if echo "$MSG" | grep -qE '^(Merge|Revert|fixup!|squash!)'; then
+  exit 0
+fi
+
+# Validate conventional commit format via commitlint
+if command -v npx &>/dev/null; then
+  echo "$MSG" | npx --no-install commitlint 2>/dev/null
+  if [ $? -ne 0 ]; then
+    echo ""
+    echo "Commit message must follow Conventional Commits format."
+    echo "Examples:"
+    echo "  feat(server): add health check endpoint"
+    echo "  fix(auth): handle expired JWT tokens"
+    echo "  refactor(services): extract base AI service class"
+    exit 1
+  fi
+else
+  # Fallback regex if npx not available
+  if ! echo "$MSG" | grep -qE '^(feat|fix|perf|refactor|docs|style|test|build|config|chore|ci|revert|security)(\([a-z-]+\))?!?: .+'; then
+    echo "Commit message does not match conventional format."
+    exit 1
+  fi
+fi
+
+echo "Commit message validated."

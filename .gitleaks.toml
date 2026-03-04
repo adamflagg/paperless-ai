@@ -1,0 +1,19 @@
+[extend]
+useDefault = true
+
+[allowlist]
+  description = "Allowlisted patterns"
+  regexTarget = "match"
+  regexes = [
+    '''your-secret-key''',
+    '''test.*api.*key''',
+    '''example\.com''',
+    '''localhost''',
+  ]
+  paths = [
+    '''tests/''',
+    '''docs/''',
+    '''\.env\.example''',
+    '''package-lock\.json''',
+    '''node_modules/''',
+  ]
