@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "Running pre-push checks..."
+
+# Check if main is behind (adapted from kindred)
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [ "$BRANCH" = "main" ]; then
+  git fetch origin main --quiet 2>/dev/null || true
+  LOCAL=$(git rev-parse HEAD)
+  REMOTE=$(git rev-parse origin/main 2>/dev/null || echo "$LOCAL")
+  BASE=$(git merge-base HEAD origin/main 2>/dev/null || echo "$LOCAL")
+  if [ "$LOCAL" != "$REMOTE" ] && [ "$LOCAL" = "$BASE" ]; then
+    echo "ERROR: main has diverged from origin/main. Pull first."
+    exit 1
+  fi
+fi
+
+# Full lint suite
+echo "  ESLint..."
+npx eslint . --max-warnings 0
+echo "  Prettier..."
+npx prettier --check '**/*.{js,json,md,yml,yaml}' --ignore-unknown
+echo "  Tests..."
+npx vitest run --reporter=dot
+echo ""
+echo "All pre-push checks passed."
