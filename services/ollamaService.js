@@ -1,20 +1,21 @@
 const { calculateTokens, writePromptToFile } = require('./serviceUtils');
 const axios = require('axios');
 const config = require('../config/config');
-const fs = require('fs').promises;
-const path = require('path');
-const paperlessService = require('./paperlessService');
 const os = require('os');
+const BaseAIService = require('./baseAIService');
 const RestrictionPromptService = require('./restrictionPromptService');
 
 /**
- * Service for document analysis using Ollama
+ * Service for document analysis using Ollama.
+ *
+ * Extends BaseAIService for shared logic (thumbnail caching, custom fields,
+ * external API data validation, error/success result shapes).
+ * Keeps Ollama-specific logic: axios-based API calls, structured JSON schema output,
+ * custom prompt building, context window calculation, and response parsing.
  */
-class OllamaService {
-  /**
-   * Initialize the Ollama service
-   */
+class OllamaService extends BaseAIService {
   constructor() {
+    super('ollama');
     this.apiUrl = config.ollama.apiUrl;
     this.model = config.ollama.model;
     this.client = axios.create({
@@ -60,15 +61,10 @@ class OllamaService {
     };
   }
 
-  /**
-   * Analyze a document and extract metadata
-   * @param {string} content - Document content
-   * @param {Array} existingTags - List of existing tags
-   * @param {Array} existingCorrespondentList - List of existing correspondents
-   * @param {string} id - Document ID
-   * @param {string} customPrompt - Custom prompt (optional)
-   * @returns {Object} Analysis results
-   */
+  getModel() {
+    return this.model;
+  }
+
   async analyzeDocument(
     content,
     existingTags = [],
@@ -82,23 +78,11 @@ class OllamaService {
       // Truncate content if needed
       content = this._truncateContent(content);
 
-      // Cache thumbnail
-      await this._handleThumbnailCaching(id);
+      // Cache thumbnail (using shared base method)
+      await this.cacheThumbnail(id);
 
-      // Get external API data if available and validate it
-      let externalApiData = options.externalApiData || null;
-      let validatedExternalApiData = null;
-
-      if (externalApiData) {
-        try {
-          validatedExternalApiData =
-            await this._validateAndTruncateExternalApiData(externalApiData);
-          console.log('[DEBUG] External API data validated and included');
-        } catch (error) {
-          console.warn('[WARNING] External API data validation failed:', error.message);
-          validatedExternalApiData = null;
-        }
-      }
+      // Validate external API data (using shared base method)
+      const validatedExternalApiData = await this.validateExternalApiData(options);
 
       // Build prompt
       let prompt;
@@ -111,29 +95,8 @@ class OllamaService {
           options
         );
       } else {
-        // Parse CUSTOM_FIELDS for custom prompt
-        let customFieldsObj;
-        try {
-          customFieldsObj = JSON.parse(process.env.CUSTOM_FIELDS);
-        } catch (error) {
-          console.error('Failed to parse CUSTOM_FIELDS:', error);
-          customFieldsObj = { custom_fields: [] };
-        }
-
-        const customFieldsTemplate = {};
-        customFieldsObj.custom_fields.forEach((field, index) => {
-          customFieldsTemplate[index] = {
-            field_name: field.value,
-            value: 'Fill in the value based on your analysis',
-          };
-        });
-
-        const customFieldsStr =
-          '"custom_fields": ' +
-          JSON.stringify(customFieldsTemplate, null, 2)
-            .split('\n')
-            .map((line) => '    ' + line)
-            .join('\n');
+        // Parse CUSTOM_FIELDS for custom prompt (using shared base method)
+        const customFieldsStr = this.buildCustomFieldsTemplate();
 
         prompt =
           customPrompt +
@@ -145,7 +108,7 @@ class OllamaService {
       }
 
       // Generate custom fields for the prompt
-      const customFieldsStr = this._generateCustomFieldsTemplate();
+      const customFieldsStr = this.buildCustomFieldsTemplate();
 
       // Generate system prompt
       const systemPrompt = this._generateSystemPrompt(customFieldsStr);
@@ -154,10 +117,7 @@ class OllamaService {
       const promptTokenCount = this._calculatePromptTokenCount(prompt);
       const numCtx = this._calculateNumCtx(promptTokenCount, 1024);
 
-      console.log(
-        `[DEBUG] Use existing data: ${config.useExistingData}, Restrictions applied based on useExistingData setting`
-      );
-      console.log(`[DEBUG] External API data: ${validatedExternalApiData ? 'included' : 'none'}`);
+      this.logAnalysisDebugInfo(validatedExternalApiData);
 
       // Call Ollama API
       const response = await this._callOllamaAPI(
@@ -181,31 +141,17 @@ class OllamaService {
       await this._logPromptAndResponse(prompt, parsedResponse);
 
       // Return results in consistent format
-      return {
-        document: parsedResponse,
-        metrics: {
-          promptTokens: 0, // Ollama doesn't provide token metrics
-          completionTokens: 0,
-          totalTokens: 0,
-        },
-        truncated: false,
-      };
+      return this.buildSuccessResult(
+        parsedResponse,
+        { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+        false
+      );
     } catch (error) {
       console.error('Error analyzing document with Ollama:', error);
-      return {
-        document: { tags: [], correspondent: null },
-        metrics: null,
-        error: error.message,
-      };
+      return this.buildErrorResult(error.message);
     }
   }
 
-  /**
-   * Analyze a document in playground mode
-   * @param {string} content - Document content
-   * @param {string} prompt - User-provided prompt
-   * @returns {Object} Analysis results
-   */
   async analyzePlayground(content, prompt) {
     try {
       // Calculate context window size
@@ -234,29 +180,79 @@ class OllamaService {
       }
 
       // Return results in consistent format
-      return {
-        document: parsedResponse,
-        metrics: {
-          promptTokens: 0,
-          completionTokens: 0,
-          totalTokens: 0,
-        },
-        truncated: false,
-      };
+      return this.buildSuccessResult(
+        parsedResponse,
+        { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+        false
+      );
     } catch (error) {
       console.error('Error analyzing document with Ollama:', error);
-      return {
-        document: { tags: [], correspondent: null },
-        metrics: null,
-        error: error.message,
-      };
+      return this.buildErrorResult(error.message);
     }
   }
 
+  async generateText(prompt) {
+    try {
+      // Calculate context window size based on prompt length
+      const promptTokenCount = this._calculatePromptTokenCount(prompt);
+      const numCtx = this._calculateNumCtx(promptTokenCount, 512);
+
+      // Simple system prompt for text generation
+      const systemPrompt = `You are a helpful assistant. Generate a clear, concise, and informative response to the user's question or request.`;
+
+      // Call Ollama API without enforcing a specific response format
+      const response = await this.client.post(`${this.apiUrl}/api/generate`, {
+        model: this.model,
+        prompt: prompt,
+        system: systemPrompt,
+        stream: false,
+        options: {
+          temperature: 0.7,
+          top_p: 0.9,
+          num_predict: 1024,
+          num_ctx: numCtx,
+        },
+      });
+
+      if (!response.data || !response.data.response) {
+        throw new Error('Invalid response from Ollama API');
+      }
+
+      return response.data.response;
+    } catch (error) {
+      console.error('Error generating text with Ollama:', error);
+      throw error;
+    }
+  }
+
+  async checkStatus() {
+    // use ollama status endpoint
+    try {
+      const response = await this.client.get(`${this.apiUrl}/api/ps`);
+      if (response.status === 200) {
+        const data = response.data;
+        // Ensure data is an array and has at least one model
+        let modelName = null;
+        if (Array.isArray(data.models) && data.models.length > 0) {
+          modelName = data.models[0].name;
+        }
+        console.log('Ollama model name:', modelName);
+        return { status: 'ok', model: modelName };
+      }
+    } catch (error) {
+      console.error('Error checking Ollama service status:', error);
+    }
+    return { status: 'error' };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Ollama-specific private methods
+  // ---------------------------------------------------------------------------
+
   /**
    * Truncate content to maximum length if specified
-   * @param {string} content - Content to truncate
-   * @returns {string} Truncated content
+   * @param {string} content
+   * @returns {string}
    */
   _truncateContent(content) {
     try {
@@ -272,11 +268,12 @@ class OllamaService {
 
   /**
    * Build prompt from content and existing data
-   * @param {string} content - Document content
-   * @param {Array} existingTags - List of existing tags
-   * @param {Array} existingCorrespondent - List of existing correspondents
-   * @param {Array} existingDocumentTypes - List of existing document types
-   * @returns {string} Formatted prompt
+   * @param {string} content
+   * @param {Array} existingTags
+   * @param {Array} existingCorrespondent
+   * @param {Array} existingDocumentTypes
+   * @param {object} options
+   * @returns {string}
    */
   _buildPrompt(
     content,
@@ -287,35 +284,10 @@ class OllamaService {
   ) {
     let systemPrompt;
 
-    // Validate that existingCorrespondent is an array and handle if it's not
     const correspondentList = Array.isArray(existingCorrespondent) ? existingCorrespondent : [];
 
-    // Parse CUSTOM_FIELDS from environment variable
-    let customFieldsObj;
-    try {
-      customFieldsObj = JSON.parse(process.env.CUSTOM_FIELDS);
-    } catch (error) {
-      console.error('Failed to parse CUSTOM_FIELDS:', error);
-      customFieldsObj = { custom_fields: [] };
-    }
-
-    // Generate custom fields template for the prompt
-    const customFieldsTemplate = {};
-
-    customFieldsObj.custom_fields.forEach((field, index) => {
-      customFieldsTemplate[index] = {
-        field_name: field.value,
-        value: 'Fill in the value based on your analysis',
-      };
-    });
-
-    // Convert template to string for replacement and wrap in custom_fields
-    const customFieldsStr =
-      '"custom_fields": ' +
-      JSON.stringify(customFieldsTemplate, null, 2)
-        .split('\n')
-        .map((line) => '    ' + line) // Add proper indentation
-        .join('\n');
+    // Build custom fields template using shared base method
+    const customFieldsStr = this.buildCustomFieldsTemplate();
 
     // Get system prompt based on configuration
     if (
@@ -323,27 +295,24 @@ class OllamaService {
       config.restrictToExistingTags === 'no' &&
       config.restrictToExistingCorrespondents === 'no'
     ) {
-      // Format existing tags
       const existingTagsList = existingTags.join(', ');
 
-      // Format existing correspondents - handle both array of objects and array of strings
       const existingCorrespondentList = correspondentList
-        .filter(Boolean) // Remove any null/undefined entries
+        .filter(Boolean)
         .map((correspondent) => {
           if (typeof correspondent === 'string') return correspondent;
           return correspondent?.name || '';
         })
-        .filter((name) => name.length > 0) // Remove empty strings
+        .filter((name) => name.length > 0)
         .join(', ');
 
-      // Format existing document types - handle both array of objects and array of strings
       const existingDocumentTypesList = existingDocumentTypes
-        .filter(Boolean) // Remove any null/undefined entries
+        .filter(Boolean)
         .map((docType) => {
           if (typeof docType === 'string') return docType;
           return docType?.name || '';
         })
-        .filter((name) => name.length > 0) // Remove empty strings
+        .filter((name) => name.length > 0)
         .join(', ');
 
       systemPrompt =
@@ -364,7 +333,7 @@ class OllamaService {
     let validatedExternalApiData = null;
     if (options.externalApiData) {
       try {
-        validatedExternalApiData = this._validateAndTruncateExternalApiData(
+        validatedExternalApiData = this._validateAndTruncateExternalApiDataSync(
           options.externalApiData
         );
         console.log('[DEBUG] External API data validated and included');
@@ -401,12 +370,13 @@ class OllamaService {
   }
 
   /**
-   * Validate and truncate external API data to prevent token overflow
-   * @param {any} apiData - The external API data to validate
-   * @param {number} maxTokens - Maximum tokens allowed for external data (default: 500)
-   * @returns {string} - Validated and potentially truncated data string
+   * Synchronous variant of external API data validation for Ollama
+   * (uses simple char-based token estimation instead of tiktoken)
+   * @param {any} apiData
+   * @param {number} maxTokens
+   * @returns {string|null}
    */
-  async _validateAndTruncateExternalApiData(apiData, maxTokens = 500) {
+  _validateAndTruncateExternalApiDataSync(apiData, maxTokens = 500) {
     if (!apiData) {
       return null;
     }
@@ -414,14 +384,12 @@ class OllamaService {
     const dataString =
       typeof apiData === 'object' ? JSON.stringify(apiData, null, 2) : String(apiData);
 
-    // Calculate tokens for the data (using simple estimation for Ollama)
     const dataTokens = Math.ceil(dataString.length / 4);
 
     if (dataTokens > maxTokens) {
       console.warn(
         `[WARNING] External API data (${dataTokens} tokens) exceeds limit (${maxTokens}), truncating`
       );
-      // Simple truncation based on character count
       const maxChars = maxTokens * 4;
       return dataString.substring(0, maxChars);
     }
@@ -431,46 +399,13 @@ class OllamaService {
   }
 
   /**
-   * Generate custom fields template for prompts
-   * @returns {string} Custom fields template as a string
-   */
-  _generateCustomFieldsTemplate() {
-    let customFieldsObj;
-    try {
-      customFieldsObj = JSON.parse(process.env.CUSTOM_FIELDS);
-    } catch (error) {
-      console.error('Failed to parse CUSTOM_FIELDS:', error);
-      customFieldsObj = { custom_fields: [] };
-    }
-
-    // Generate custom fields template for the prompt
-    const customFieldsTemplate = {};
-
-    customFieldsObj.custom_fields.forEach((field, index) => {
-      customFieldsTemplate[index] = {
-        field_name: field.value,
-        value: 'Fill in the value based on your analysis',
-      };
-    });
-
-    // Convert template to string for replacement and wrap in custom_fields
-    return (
-      '"custom_fields": ' +
-      JSON.stringify(customFieldsTemplate, null, 2)
-        .split('\n')
-        .map((line) => '    ' + line) // Add proper indentation
-        .join('\n')
-    );
-  }
-
-  /**
    * Generate system prompt for document analysis
-   * @param {string} customFieldsStr - Custom fields as a string
-   * @returns {string} System prompt
+   * @param {string} customFieldsStr
+   * @returns {string}
    */
   _generateSystemPrompt(customFieldsStr) {
     let systemPromptTemplate = `
-            You are a document analyzer. Your task is to analyze documents and extract relevant information. You do not ask back questions. 
+            You are a document analyzer. Your task is to analyze documents and extract relevant information. You do not ask back questions.
             YOU MUSTNOT: Ask for additional information or clarification, or ask questions about the document, or ask for additional context.
             YOU MUSTNOT: Return a response without the desired JSON format.
             YOU MUST: Return the result EXCLUSIVELY as a JSON object. The Tags, Title and Document_Type MUST be in the language that is used in the document.:
@@ -493,11 +428,11 @@ class OllamaService {
 
   /**
    * Generate system prompt for playground analysis
-   * @returns {string} System prompt
+   * @returns {string}
    */
   _generatePlaygroundSystemPrompt() {
     return `
-            You are a document analyzer. Your task is to analyze documents and extract relevant information. You do not ask back questions. 
+            You are a document analyzer. Your task is to analyze documents and extract relevant information. You do not ask back questions.
             YOU MUSTNOT: Ask for additional information or clarification, or ask questions about the document, or ask for additional context.
             YOU MUSTNOT: Return a response without the desired JSON format.
             YOU MUST: Analyze the document content and extract the following information into this structured JSON format and only this format!:         {
@@ -513,9 +448,9 @@ class OllamaService {
   }
 
   /**
-   * Calculate prompt token count
-   * @param {string} prompt - Prompt text
-   * @returns {number} Estimated token count
+   * Calculate prompt token count (char-based estimation)
+   * @param {string} prompt
+   * @returns {number}
    */
   _calculatePromptTokenCount(prompt) {
     return Math.ceil(prompt.length / 4);
@@ -523,9 +458,9 @@ class OllamaService {
 
   /**
    * Calculate context window size for Ollama
-   * @param {number} promptTokenCount - Token count for prompt
-   * @param {number} expectedResponseTokens - Expected response token count
-   * @returns {number} Context window size
+   * @param {number} promptTokenCount
+   * @param {number} expectedResponseTokens
+   * @returns {number}
    */
   _calculateNumCtx(promptTokenCount, expectedResponseTokens) {
     const totalTokenUsage = promptTokenCount + expectedResponseTokens;
@@ -542,7 +477,7 @@ class OllamaService {
 
   /**
    * Get available system memory
-   * @returns {Object} Object with totalMemoryMB and freeMemoryMB
+   * @returns {Object}
    */
   async _getAvailableMemory() {
     const totalMemory = os.totalmem();
@@ -553,35 +488,12 @@ class OllamaService {
   }
 
   /**
-   * Handle thumbnail caching for documents
-   * @param {string} id - Document ID
-   */
-  async _handleThumbnailCaching(id) {
-    if (!id) return;
-
-    const cachePath = path.join('./public/images', `${id}.png`);
-    try {
-      await fs.access(cachePath);
-      console.log('[DEBUG] Thumbnail already cached');
-    } catch (_err) {
-      console.log('Thumbnail not cached, fetching from Paperless');
-      const thumbnailData = await paperlessService.getThumbnailImage(id);
-      if (!thumbnailData) {
-        console.warn('Thumbnail nicht gefunden');
-        return;
-      }
-      await fs.mkdir(path.dirname(cachePath), { recursive: true });
-      await fs.writeFile(cachePath, thumbnailData);
-    }
-  }
-
-  /**
    * Call Ollama API
-   * @param {string} prompt - Prompt text
-   * @param {string} systemPrompt - System prompt
-   * @param {number} numCtx - Context window size
-   * @param {Object} schema - Response schema
-   * @returns {Object} Ollama API response
+   * @param {string} prompt
+   * @param {string} systemPrompt
+   * @param {number} numCtx
+   * @param {Object} schema
+   * @returns {Object}
    */
   async _callOllamaAPI(prompt, systemPrompt, numCtx, schema) {
     const response = await this.client.post(`${this.apiUrl}/api/generate`, {
@@ -609,13 +521,11 @@ class OllamaService {
 
   /**
    * Process Ollama API response
-   * @param {Object} responseData - Ollama API response data
-   * @returns {Object} Parsed response
+   * @param {Object} responseData
+   * @returns {Object}
    */
   _processOllamaResponse(responseData) {
-    // Check if we got a structured response or need to parse from text
     if (responseData.response && typeof responseData.response === 'object') {
-      // We got a structured response directly
       console.log('Using structured output response');
       return {
         tags: Array.isArray(responseData.response.tags) ? responseData.response.tags : [],
@@ -627,7 +537,6 @@ class OllamaService {
         custom_fields: responseData.response.custom_fields || null,
       };
     } else if (responseData.response) {
-      // Fall back to parsing from text response
       console.log('Falling back to text response parsing');
       return this._parseResponse(responseData.response);
     } else {
@@ -637,12 +546,11 @@ class OllamaService {
 
   /**
    * Parse text response to extract JSON
-   * @param {string} response - Response text
-   * @returns {Object} Parsed object
+   * @param {string} response
+   * @returns {Object}
    */
   _parseResponse(response) {
     try {
-      // Find JSON in response using regex
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         return { tags: [], correspondent: null };
@@ -652,10 +560,7 @@ class OllamaService {
       console.log('Extracted JSON String:', jsonStr);
 
       try {
-        // Attempt to parse the JSON
         const result = JSON.parse(jsonStr);
-
-        // Validate and return the result
         return {
           tags: Array.isArray(result.tags) ? result.tags : [],
           correspondent: result.correspondent || null,
@@ -665,11 +570,10 @@ class OllamaService {
           language: result.language || null,
           custom_fields: result.custom_fields || null,
         };
-      } catch (jsonError) {
-        console.warn('Error parsing JSON from response:', jsonError.message);
+      } catch (_jsonError) {
+        console.warn('Error parsing JSON from response:', _jsonError.message);
         console.warn('Attempting to sanitize the JSON...');
 
-        // Sanitize the JSON
         jsonStr = this._sanitizeJsonString(jsonStr);
 
         try {
@@ -696,20 +600,20 @@ class OllamaService {
 
   /**
    * Sanitize a JSON string
-   * @param {string} jsonStr - JSON string to sanitize
-   * @returns {string} Sanitized JSON string
+   * @param {string} jsonStr
+   * @returns {string}
    */
   _sanitizeJsonString(jsonStr) {
     return jsonStr
-      .replace(/,\s*}/g, '}') // Remove trailing commas before closing braces
-      .replace(/,\s*]/g, ']') // Remove trailing commas before closing brackets
-      .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?\s*:/g, '"$2":'); // Ensure property names are quoted
+      .replace(/,\s*}/g, '}')
+      .replace(/,\s*]/g, ']')
+      .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?\s*:/g, '"$2":');
   }
 
   /**
    * Log prompt and response to file
-   * @param {string} prompt - Prompt text
-   * @param {Object} response - Response object
+   * @param {string} prompt
+   * @param {Object} response
    */
   async _logPromptAndResponse(prompt, response) {
     const content =
@@ -721,69 +625,6 @@ class OllamaService {
       '================================================================================\n\n';
 
     await writePromptToFile(content);
-  }
-
-  /**
-   * Generate text based on a prompt
-   * @param {string} prompt - The prompt to generate text from
-   * @returns {Promise<string>} - The generated text
-   */
-  async generateText(prompt) {
-    try {
-      // Calculate context window size based on prompt length
-      const promptTokenCount = this._calculatePromptTokenCount(prompt);
-      const numCtx = this._calculateNumCtx(promptTokenCount, 512);
-
-      // Simple system prompt for text generation
-      const systemPrompt = `You are a helpful assistant. Generate a clear, concise, and informative response to the user's question or request.`;
-
-      // Call Ollama API without enforcing a specific response format
-      const response = await this.client.post(`${this.apiUrl}/api/generate`, {
-        model: this.model,
-        prompt: prompt,
-        system: systemPrompt,
-        stream: false,
-        options: {
-          temperature: 0.7,
-          top_p: 0.9,
-          num_predict: 1024,
-          num_ctx: numCtx,
-        },
-      });
-
-      if (!response.data || !response.data.response) {
-        throw new Error('Invalid response from Ollama API');
-      }
-
-      return response.data.response;
-    } catch (error) {
-      console.error('Error generating text with Ollama:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Check if the Ollama service is running
-   * @returns {Promise<boolean>} - True if the service is running, false otherwise
-   */
-  async checkStatus() {
-    // use ollama status endpoint
-    try {
-      const response = await this.client.get(`${this.apiUrl}/api/ps`);
-      if (response.status === 200) {
-        const data = response.data;
-        // Ensure data is an array and has at least one model
-        let modelName = null;
-        if (Array.isArray(data.models) && data.models.length > 0) {
-          modelName = data.models[0].name;
-        }
-        console.log('Ollama model name:', modelName);
-        return { status: 'ok', model: modelName };
-      }
-    } catch (error) {
-      console.error('Error checking Ollama service status:', error);
-    }
-    return { status: 'error' };
   }
 }
 
