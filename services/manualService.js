@@ -78,7 +78,7 @@ class ManualService {
         .replace(/```\n?/g, '')
         .trim();
 
-      const parsedResponse = JSON.parse(jsonContent);
+      let parsedResponse;
       try {
         parsedResponse = JSON.parse(jsonContent);
         fs.appendFile('./logs/response.txt', jsonContent, (err) => {
@@ -127,7 +127,7 @@ class ManualService {
         .replace(/```\n?/g, '')
         .trim();
 
-      const parsedResponse = JSON.parse(jsonContent);
+      let parsedResponse;
       try {
         parsedResponse = JSON.parse(jsonContent);
         fs.appendFile('./logs/response.txt', jsonContent, (err) => {
