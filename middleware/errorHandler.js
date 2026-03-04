@@ -1,5 +1,5 @@
 const errorHandler = (err, _req, res, _next) => {
-  console.error(`[ERROR] ${err.message}`, { stack: err.stack });
+  console.error(err.message, { stack: err.stack });
 
   if (err.name === 'UnauthorizedError') {
     return res.status(401).json({ error: 'Invalid token' });

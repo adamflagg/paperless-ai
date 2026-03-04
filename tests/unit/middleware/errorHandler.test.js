@@ -65,6 +65,6 @@ describe('errorHandler middleware', () => {
   it('logs error with stack', () => {
     const err = new Error('test error');
     errorHandler(err, {}, mockRes, () => {});
-    expect(console.error).toHaveBeenCalledWith('[ERROR] test error', { stack: err.stack });
+    expect(console.error).toHaveBeenCalledWith('test error', { stack: err.stack });
   });
 });

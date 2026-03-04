@@ -79,7 +79,7 @@ router.post('/api/key-regenerate', async (req, res) => {
 
     // Sende die Antwort zurück
     res.json({ success: apiKey });
-    console.log('API key regenerated:', apiKey);
+    console.debug('API key regenerated:', apiKey);
   } catch (error) {
     console.error('API key regeneration error:', error);
     res.status(500).json({ error: 'Error regenerating API key' });
@@ -207,8 +207,8 @@ router.get('/settings', async (req, res) => {
   }
 
   // Debug-output
-  console.log('Current config TAGS:', config.TAGS);
-  console.log('Current config PROMPT_TAGS:', config.PROMPT_TAGS);
+  console.debug('Current config TAGS:', config.TAGS);
+  console.debug('Current config PROMPT_TAGS:', config.PROMPT_TAGS);
   const version = configFile.PAPERLESS_AI_VERSION || ' ';
   res.render('settings', {
     version,
@@ -528,7 +528,7 @@ router.post('/settings', express.json(), async (req, res) => {
         );
       }
     } catch (error) {
-      console.log('[ERROR] Error creating custom fields:', error);
+      console.error('Error creating custom fields:', error);
     }
 
     const normalizeArray = (value) => {
@@ -694,7 +694,7 @@ router.post('/settings', express.json(), async (req, res) => {
     // Handle API key
     let apiToken = process.env.API_KEY;
     if (!apiToken) {
-      console.log('Generating new API key');
+      console.debug('Generating new API key');
       apiToken = require('crypto').randomBytes(64).toString('hex');
       updatedConfig.API_KEY = apiToken;
     }
@@ -714,7 +714,7 @@ router.post('/settings', express.json(), async (req, res) => {
         );
       }
     } catch (error) {
-      console.log('[ERROR] Error creating custom fields:', error);
+      console.error('Error creating custom fields:', error);
     }
 
     res.json({

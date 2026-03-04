@@ -86,7 +86,7 @@ router.get('/dashboard/doc/:id', async (req, res) => {
     const paperlessUrl = process.env.PAPERLESS_API_URL;
     const paperlessUrlWithoutApi = paperlessUrl.replace('/api', '');
     const redirectUrl = `${paperlessUrlWithoutApi}/documents/${docId}/details`;
-    console.log('Redirecting to Paperless-ngx URL:', redirectUrl);
+    console.debug('Redirecting to Paperless-ngx URL:', redirectUrl);
     res.redirect(redirectUrl);
   } catch (error) {
     console.error('Error fetching document:', error);

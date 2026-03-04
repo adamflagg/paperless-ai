@@ -7,7 +7,7 @@ let JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   JWT_SECRET = crypto.randomBytes(64).toString('hex');
   console.warn(
-    '[WARN] JWT_SECRET not set — using random ephemeral secret. Sessions will not persist across restarts.'
+    'JWT_SECRET not set — using random ephemeral secret. Sessions will not persist across restarts.'
   );
 }
 

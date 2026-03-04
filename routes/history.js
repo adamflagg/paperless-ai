@@ -47,7 +47,7 @@ router.get('/history', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[ERROR] loading history page:', error);
+    console.error('Error loading history page:', error);
     res.status(500).send('Error loading history page');
   }
 });
@@ -182,7 +182,7 @@ router.get('/api/history', async (req, res) => {
       data: filteredDocs.slice(start, start + length),
     });
   } catch (error) {
-    console.error('[ERROR] loading history data:', error);
+    console.error('Error loading history data:', error);
     res.status(500).json({ error: 'Error loading history data' });
   }
 });

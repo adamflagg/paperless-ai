@@ -76,7 +76,7 @@ const configFile = require('../config/config.js');
 router.get('/manual/preview/:id', async (req, res) => {
   try {
     const documentId = req.params.id;
-    console.log('Fetching content for document:', documentId);
+    console.debug('Fetching content for document:', documentId);
 
     const response = await fetch(`${process.env.PAPERLESS_API_URL}/documents/${documentId}/`, {
       headers: {
@@ -98,7 +98,7 @@ router.get('/manual/preview/:id', async (req, res) => {
         return tagName;
       })
     );
-    console.log('Document Data:', document);
+    console.debug('Document Data:', document);
     res.json({
       content: document.content,
       title: document.title,
@@ -269,7 +269,7 @@ router.post('/manual/analyze', express.json(), async (req, res) => {
     let existingDocumentTypesList = existingDocumentTypes.map((docType) => docType.name);
 
     if (!content || typeof content !== 'string') {
-      console.log('Invalid content received:', content);
+      console.warn('Invalid content received:', content);
       return res.status(400).json({ error: 'Valid content string is required' });
     }
 
@@ -379,7 +379,7 @@ router.post('/manual/playground', express.json(), async (req, res) => {
     const { content, prompt, documentId } = req.body;
 
     if (!content || typeof content !== 'string') {
-      console.log('Invalid content received:', content);
+      console.warn('Invalid content received:', content);
       return res.status(400).json({ error: 'Valid content string is required' });
     }
 
@@ -475,14 +475,14 @@ router.post('/manual/playground', express.json(), async (req, res) => {
 router.post('/manual/updateDocument', express.json(), async (req, res) => {
   try {
     var { documentId, tags, correspondent, title } = req.body;
-    console.log('TITLE: ', title);
+    console.debug('TITLE:', title);
     // Convert all tags to names if they are IDs
     tags = await Promise.all(
       tags.map(async (tag) => {
-        console.log('Processing tag:', tag);
+        console.debug('Processing tag:', tag);
         if (!isNaN(tag)) {
           const tagName = await paperlessService.getTagTextFromId(Number(tag));
-          console.log('Converted tag ID:', tag, 'to name:', tagName);
+          console.debug('Converted tag ID:', tag, 'to name:', tagName);
           return tagName;
         }
         return tag;

@@ -42,7 +42,7 @@ router.get('/sampleData/:id', async (req, res) => {
     const document = await paperlessService.getDocument(req.params.id);
     await paperlessService.getCorrespondentsFromDocument(document.id);
   } catch (error) {
-    console.error('[ERRO] loading sample data:', error);
+    console.error('Error loading sample data:', error);
     res.status(500).json({ error: 'Error loading sample data' });
   }
 });
@@ -83,7 +83,7 @@ router.get('/playground', async (req, res) => {
       version: configFile.PAPERLESS_AI_VERSION || ' ',
     });
   } catch (error) {
-    console.error('[ERRO] loading documents view:', error);
+    console.error('Error loading documents view:', error);
     res.status(500).send('Error loading documents');
   }
 });
@@ -121,12 +121,12 @@ router.get('/thumb/:documentId', async (req, res) => {
     // Check if image exists in cache
     try {
       await fs.access(cachePath);
-      console.log('Serving cached thumbnail');
+      console.debug('Serving cached thumbnail');
 
       res.setHeader('Content-Type', 'image/png');
       return res.sendFile(path.resolve(cachePath));
     } catch (_err) {
-      console.log('Thumbnail not cached, fetching from Paperless');
+      console.debug('Thumbnail not cached, fetching from Paperless');
 
       const thumbnailData = await paperlessService.getThumbnailImage(req.params.documentId);
 
@@ -173,7 +173,7 @@ router.post('/api/reset-all-documents', async (req, res) => {
     await documentModel.deleteAllDocuments();
     res.json({ success: true });
   } catch (error) {
-    console.error('[ERROR] resetting documents:', error);
+    console.error('Error resetting documents:', error);
     res.status(500).json({ error: 'Error resetting documents' });
   }
 });
@@ -224,7 +224,7 @@ router.post('/api/reset-documents', async (req, res) => {
     await documentModel.deleteDocumentsIdList(ids);
     res.json({ success: true });
   } catch (error) {
-    console.error('[ERROR] resetting documents:', error);
+    console.error('Error resetting documents:', error);
     res.status(500).json({ error: 'Error resetting documents' });
   }
 });
