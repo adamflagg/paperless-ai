@@ -37,27 +37,27 @@ new Logger({
 const app = express();
 let runningTask = false;
 
-const corsOptions = {
-  origin: true,
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'x-api-key', 'Access-Control-Allow-Private-Network'],
-  credentials: false,
-};
+const allowedOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',').map((s) => s.trim())
+  : [process.env.PAPERLESS_API_URL].filter(Boolean);
 
-app.use(cors(corsOptions));
+app.use(
+  cors({
+    origin: allowedOrigins.length > 0 ? allowedOrigins : true,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'x-api-key',
+      'Access-Control-Allow-Private-Network',
+      'Authorization',
+    ],
+  })
+);
 
+// Support Private Network Access preflight (Chrome 104+)
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.header(
-    'Access-Control-Allow-Headers',
-    'Content-Type, x-api-key, Access-Control-Allow-Private-Network'
-  );
   res.header('Access-Control-Allow-Private-Network', 'true');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
   next();
 });
 
