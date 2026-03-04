@@ -199,9 +199,9 @@ class ManualService {
 
         const numCtx = Math.min(totalTokenUsage, maxCtxLimit);
 
-        console.log('Prompt Token Count:', promptTokenCount);
-        console.log('Expected Response Tokens:', expectedResponseTokens);
-        console.log('Dynamic calculated num_ctx:', numCtx);
+        console.debug('Prompt Token Count:', promptTokenCount);
+        console.debug('Expected Response Tokens:', expectedResponseTokens);
+        console.debug('Dynamic calculated num_ctx:', numCtx);
 
         return numCtx;
       };

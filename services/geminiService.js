@@ -76,11 +76,11 @@ class GeminiService extends BaseAIService {
         );
       }
 
-      console.log(`[DEBUG] [${timestamp}] Gemini request sent`);
+      console.debug(`[${timestamp}] Gemini request sent`);
 
       const mappedUsage = this.mapGeminiUsage(response.usageMetadata);
 
-      console.log(`[DEBUG] [${timestamp}] Total tokens: ${mappedUsage.totalTokens}`);
+      console.debug(`[${timestamp}] Total tokens: ${mappedUsage.totalTokens}`);
 
       const parsedResponse = this.parseAIResponse(response.text);
       this.validateAIResponse(parsedResponse);
@@ -126,11 +126,11 @@ class GeminiService extends BaseAIService {
         );
       }
 
-      console.log(`[DEBUG] [${timestamp}] Gemini request sent`);
+      console.debug(`[${timestamp}] Gemini request sent`);
 
       const mappedUsage = this.mapGeminiUsage(response.usageMetadata);
 
-      console.log(`[DEBUG] [${timestamp}] Total tokens: ${mappedUsage.totalTokens}`);
+      console.debug(`[${timestamp}] Total tokens: ${mappedUsage.totalTokens}`);
 
       const parsedResponse = this.parseAIResponse(response.text);
       this.validateAIResponse(parsedResponse);

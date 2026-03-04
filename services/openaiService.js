@@ -88,8 +88,8 @@ class OpenAIService extends BaseAIService {
         throw new Error('Invalid API response structure');
       }
 
-      console.log(`[DEBUG] [${timestamp}] OpenAI request sent`);
-      console.log(`[DEBUG] [${timestamp}] Total tokens: ${response.usage.total_tokens}`);
+      console.debug(`[${timestamp}] OpenAI request sent`);
+      console.debug(`[${timestamp}] Total tokens: ${response.usage.total_tokens}`);
 
       const mappedUsage = this.mapOpenAIUsage(response.usage);
       const parsedResponse = this.parseAIResponse(response.choices[0].message.content);
@@ -135,8 +135,8 @@ class OpenAIService extends BaseAIService {
         throw new Error('Invalid API response structure');
       }
 
-      console.log(`[DEBUG] [${timestamp}] OpenAI request sent`);
-      console.log(`[DEBUG] [${timestamp}] Total tokens: ${response.usage.total_tokens}`);
+      console.debug(`[${timestamp}] OpenAI request sent`);
+      console.debug(`[${timestamp}] Total tokens: ${response.usage.total_tokens}`);
 
       const mappedUsage = this.mapOpenAIUsage(response.usage);
       const parsedResponse = this.parseAIResponse(response.choices[0].message.content);

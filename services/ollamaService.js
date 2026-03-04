@@ -105,7 +105,7 @@ class OllamaService extends BaseAIService {
           config.mustHavePrompt.replace('%CUSTOMFIELDS%', customFieldsStr) +
           '\n\n' +
           JSON.stringify(content);
-        console.log('[DEBUG] Ollama Service started with custom prompt');
+        console.debug('Ollama Service started with custom prompt');
       }
 
       // Generate custom fields for the prompt
@@ -237,7 +237,7 @@ class OllamaService extends BaseAIService {
         if (Array.isArray(data.models) && data.models.length > 0) {
           modelName = data.models[0].name;
         }
-        console.log('Ollama model name:', modelName);
+        console.debug('Ollama model name:', modelName);
         return { status: 'ok', model: modelName };
       }
     } catch (error) {
@@ -258,7 +258,7 @@ class OllamaService extends BaseAIService {
   _truncateContent(content) {
     try {
       if (process.env.CONTENT_MAX_LENGTH) {
-        console.log('Truncating content to max length:', process.env.CONTENT_MAX_LENGTH);
+        console.debug('Truncating content to max length:', process.env.CONTENT_MAX_LENGTH);
         return content.substring(0, process.env.CONTENT_MAX_LENGTH);
       }
     } catch (error) {
@@ -337,9 +337,9 @@ class OllamaService extends BaseAIService {
         validatedExternalApiData = this._validateAndTruncateExternalApiDataSync(
           options.externalApiData
         );
-        console.log('[DEBUG] External API data validated and included');
+        console.debug('External API data validated and included');
       } catch (error) {
-        console.warn('[WARNING] External API data validation failed:', error.message);
+        console.warn('External API data validation failed:', error.message);
         validatedExternalApiData = null;
       }
     }
@@ -389,13 +389,13 @@ class OllamaService extends BaseAIService {
 
     if (dataTokens > maxTokens) {
       console.warn(
-        `[WARNING] External API data (${dataTokens} tokens) exceeds limit (${maxTokens}), truncating`
+        `External API data (${dataTokens} tokens) exceeds limit (${maxTokens}), truncating`
       );
       const maxChars = maxTokens * 4;
       return dataString.substring(0, maxChars);
     }
 
-    console.log(`[DEBUG] External API data validated: ${dataTokens} tokens`);
+    console.debug(`External API data validated: ${dataTokens} tokens`);
     return dataString;
   }
 
@@ -469,9 +469,9 @@ class OllamaService extends BaseAIService {
 
     const numCtx = Math.min(totalTokenUsage, maxCtxLimit);
 
-    console.log('Prompt Token Count:', promptTokenCount);
-    console.log('Expected Response Tokens:', expectedResponseTokens);
-    console.log('Dynamic calculated num_ctx:', numCtx);
+    console.debug('Prompt Token Count:', promptTokenCount);
+    console.debug('Expected Response Tokens:', expectedResponseTokens);
+    console.debug('Dynamic calculated num_ctx:', numCtx);
 
     return numCtx;
   }
@@ -527,7 +527,7 @@ class OllamaService extends BaseAIService {
    */
   _processOllamaResponse(responseData) {
     if (responseData.response && typeof responseData.response === 'object') {
-      console.log('Using structured output response');
+      console.debug('Using structured output response');
       return {
         tags: Array.isArray(responseData.response.tags) ? responseData.response.tags : [],
         correspondent: responseData.response.correspondent || null,
@@ -538,7 +538,7 @@ class OllamaService extends BaseAIService {
         custom_fields: responseData.response.custom_fields || null,
       };
     } else if (responseData.response) {
-      console.log('Falling back to text response parsing');
+      console.debug('Falling back to text response parsing');
       return this._parseResponse(responseData.response);
     } else {
       throw new Error('No response data from Ollama API');
@@ -558,7 +558,7 @@ class OllamaService extends BaseAIService {
       }
 
       let jsonStr = jsonMatch[0];
-      console.log('Extracted JSON String:', jsonStr);
+      console.debug('Extracted JSON String:', jsonStr);
 
       try {
         const result = JSON.parse(jsonStr);

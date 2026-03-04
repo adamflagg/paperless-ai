@@ -54,9 +54,9 @@ class BaseAIService {
     const cachePath = path.join('./public/images', `${documentId}.png`);
     try {
       await fs.access(cachePath);
-      console.log('[DEBUG] Thumbnail already cached');
+      console.debug('Thumbnail already cached');
     } catch (_err) {
-      console.log('Thumbnail not cached, fetching from Paperless');
+      console.debug('Thumbnail not cached, fetching from Paperless');
 
       const thumbnailData = await paperlessService.getThumbnailImage(documentId);
 
@@ -178,7 +178,7 @@ class BaseAIService {
     }
 
     if (customPrompt) {
-      console.log('[DEBUG] Replace system prompt with custom prompt');
+      console.debug('Replace system prompt with custom prompt');
       systemPrompt = customPrompt + '\n\n' + config.mustHavePrompt;
     }
 
@@ -211,13 +211,13 @@ class BaseAIService {
 
     if (availableTokens <= 0) {
       console.warn(
-        `[WARNING] No available tokens for content. Reserved: ${reservedTokens}, Max: ${maxTokens}`
+        `No available tokens for content. Reserved: ${reservedTokens}, Max: ${maxTokens}`
       );
       throw new Error('Token limit exceeded: prompt too large for available token limit');
     }
 
-    console.log(
-      `[DEBUG] Token calculation - Prompt: ${totalPromptTokens}, Reserved: ${reservedTokens}, Available: ${availableTokens}`
+    console.debug(
+      `Token calculation - Prompt: ${totalPromptTokens}, Reserved: ${reservedTokens}, Available: ${availableTokens}`
     );
 
     return { totalPromptTokens, availableTokens };
@@ -266,7 +266,7 @@ class BaseAIService {
       parsedResponse = JSON.parse(jsonContent);
       // Append to response log (fire-and-forget)
       fs.appendFile('./logs/response.txt', jsonContent, (_err) => {
-        if (_err) console.error('[ERROR] Failed to append to response log:', _err);
+        if (_err) console.error('Failed to append to response log:', _err);
       });
     } catch (_error) {
       console.error('Failed to parse JSON response:', _error);
@@ -320,12 +320,12 @@ class BaseAIService {
 
     if (dataTokens > maxTokens) {
       console.warn(
-        `[WARNING] External API data (${dataTokens} tokens) exceeds limit (${maxTokens}), truncating`
+        `External API data (${dataTokens} tokens) exceeds limit (${maxTokens}), truncating`
       );
       return await truncateToTokenLimit(dataString, maxTokens, resolvedModel);
     }
 
-    console.log(`[DEBUG] External API data validated: ${dataTokens} tokens`);
+    console.debug(`External API data validated: ${dataTokens} tokens`);
     return dataString;
   }
 
@@ -343,9 +343,9 @@ class BaseAIService {
     if (externalApiData) {
       try {
         validatedExternalApiData = await this._validateAndTruncateExternalApiData(externalApiData);
-        console.log('[DEBUG] External API data validated and included');
+        console.debug('External API data validated and included');
       } catch (error) {
-        console.warn('[WARNING] External API data validation failed:', error.message);
+        console.warn('External API data validation failed:', error.message);
         validatedExternalApiData = null;
       }
     }
@@ -399,10 +399,10 @@ class BaseAIService {
    * @param {string|null} validatedExternalApiData
    */
   logAnalysisDebugInfo(validatedExternalApiData) {
-    console.log(
-      `[DEBUG] Use existing data: ${config.useExistingData}, Restrictions applied based on useExistingData setting`
+    console.debug(
+      `Use existing data: ${config.useExistingData}, Restrictions applied based on useExistingData setting`
     );
-    console.log(`[DEBUG] External API data: ${validatedExternalApiData ? 'included' : 'none'}`);
+    console.debug(`External API data: ${validatedExternalApiData ? 'included' : 'none'}`);
   }
 
   /**

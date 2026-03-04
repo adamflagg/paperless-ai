@@ -93,7 +93,7 @@ class SetupService {
         });
         const now = new Date();
         const timestamp = now.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
-        console.log(`[DEBUG] [${timestamp}] OpenAI request sent`);
+        console.debug(`[${timestamp}] OpenAI request sent`);
         return response.choices && response.choices.length > 0;
       } catch (error) {
         console.error('OpenAI validation error:', error.message);
@@ -110,7 +110,7 @@ class SetupService {
       apiKey: apiKey,
       model: model,
     };
-    console.log('Custom AI config:', config);
+    console.debug('Custom AI config:', config);
     try {
       const openai = new OpenAI({
         apiKey: config.apiKey,
@@ -142,7 +142,7 @@ class SetupService {
   }
 
   async validateAzureConfig(apiKey, endpoint, deploymentName, apiVersion) {
-    console.log('Endpoint: ', endpoint);
+    console.debug('Endpoint:', endpoint);
     if (config.CONFIGURED === false) {
       try {
         const openai = new AzureOpenAI({
@@ -157,7 +157,7 @@ class SetupService {
         });
         const now = new Date();
         const timestamp = now.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
-        console.log(`[DEBUG] [${timestamp}] OpenAI request sent`);
+        console.debug(`[${timestamp}] OpenAI request sent`);
         return response.choices && response.choices.length > 0;
       } catch (error) {
         console.error('OpenAI validation error:', error.message);
@@ -178,7 +178,7 @@ class SetupService {
         });
         const now = new Date();
         const timestamp = now.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
-        console.log(`[DEBUG] [${timestamp}] Gemini request sent`);
+        console.debug(`[${timestamp}] Gemini request sent`);
         return !!response.text;
       } catch (error) {
         console.error('Gemini validation error:', error.message);
