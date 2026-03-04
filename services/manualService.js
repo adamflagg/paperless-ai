@@ -1,3 +1,5 @@
+const fs = require('fs');
+const os = require('os');
 const { writePromptToFile } = require('./serviceUtils');
 const axios = require('axios');
 const OpenAI = require('openai');

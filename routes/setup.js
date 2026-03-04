@@ -1030,7 +1030,7 @@ router.get('/chat/init/:documentId', async (req, res) => {
  */
 router.get('/history', async (req, res) => {
   try {
-    await paperlessService.getTags();
+    const allTags = await paperlessService.getTags();
 
     // Get all correspondents for filter dropdown
     const historyDocuments = await documentModel.getAllHistory();
@@ -1545,7 +1545,6 @@ router.post('/api/scan/now', async (req, res) => {
     } catch (error) {
       console.error('[ERROR]  during document scan:', error);
     } finally {
-      runningTask = false;
       console.log('[INFO] Task completed');
       res.send('Task completed');
     }

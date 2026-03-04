@@ -711,7 +711,7 @@ class PaperlessService {
     return documents;
   }
 
-  async getAllDocumentIds() {
+  async getAllDocumentIds(page = 1) {
     /**
      * Get all Document IDs from the Paperless API.
      *
