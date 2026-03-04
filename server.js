@@ -482,6 +482,7 @@ app.use('/', require('./routes/history'));
 app.use('/', require('./routes/dashboard'));
 app.use('/', require('./routes/documents'));
 app.use('/', require('./routes/settings'));
+app.use('/', require('./routes/chat'));
 require('./routes/auth');
 const ragRoutes = require('./routes/rag');
 
