@@ -8,6 +8,7 @@ const paperlessService = require('./services/paperlessService');
 const AIServiceFactory = require('./services/aiServiceFactory');
 const documentModel = require('./models/document');
 const setupService = require('./services/setupService');
+const { createAuthSetupMiddleware } = require('./middleware/authSetup');
 const setupRoutes = require('./routes/setup');
 
 // Add environment variables for RAG service if not already set
@@ -146,6 +147,9 @@ app.set('views', path.join(__dirname, 'views'));
 //   };
 //   next();
 // });
+
+// Centralized auth + setup check middleware (see middleware/authSetup.js)
+app.use(createAuthSetupMiddleware(setupService));
 
 // Initialize data directory
 async function initializeDataDirectory() {

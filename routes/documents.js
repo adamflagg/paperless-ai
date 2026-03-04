@@ -7,25 +7,8 @@ const configFile = require('../config/config.js');
 const RAGService = require('../services/ragService.js');
 const fs = require('fs').promises;
 const path = require('path');
-const jwt = require('jsonwebtoken');
-const { JWT_SECRET } = require('./auth');
 
-// Protected route middleware for API endpoints
-const protectApiRoute = (req, res, next) => {
-  const token = req.cookies.jwt || req.headers.authorization?.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ message: 'Authentication required' });
-  }
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch (_error) {
-    return res.status(403).json({ message: 'Invalid or expired token' });
-  }
-};
+// Auth is now handled at the app level in server.js
 
 /**
  * @swagger
@@ -84,7 +67,7 @@ router.get('/sampleData/:id', async (req, res) => {
  *       500:
  *         description: Server error
  */
-router.get('/playground', protectApiRoute, async (req, res) => {
+router.get('/playground', async (req, res) => {
   try {
     const { documents, tagNames, correspondentNames, paperlessUrl } =
       await documentsService.getDocumentsWithMetadata();

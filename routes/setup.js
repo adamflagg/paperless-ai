@@ -121,65 +121,7 @@ require('dotenv').config({ path: '../data/.env' });
  *           example: "#FF5733"
  */
 
-// API endpoints that should not redirect
-// Routes that don't require authentication
-let PUBLIC_ROUTES = ['/health', '/login', '/logout', '/setup'];
-
-// Combined middleware to check authentication and setup
-router.use(async (req, res, next) => {
-  const token = req.cookies.jwt || req.headers.authorization?.split(' ')[1];
-  const apiKey = req.headers['x-api-key'];
-
-  // Public route check
-  if (PUBLIC_ROUTES.some((route) => req.path.startsWith(route))) {
-    return next();
-  }
-
-  // API key authentication
-  if (apiKey && apiKey === process.env.API_KEY) {
-    req.user = { apiKey: true };
-  } else {
-    // Fallback to JWT authentication
-    if (!token) {
-      return res.redirect('/login');
-    }
-
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET);
-      req.user = decoded;
-    } catch (_error) {
-      res.clearCookie('jwt');
-      return res.redirect('/login');
-    }
-  }
-
-  // Setup check
-  try {
-    const isConfigured = await setupService.isConfigured();
-
-    if (
-      !isConfigured &&
-      (!process.env.PAPERLESS_AI_INITIAL_SETUP ||
-        process.env.PAPERLESS_AI_INITIAL_SETUP === 'no') &&
-      !req.path.startsWith('/setup')
-    ) {
-      return res.redirect('/setup');
-    } else if (
-      !isConfigured &&
-      process.env.PAPERLESS_AI_INITIAL_SETUP === 'yes' &&
-      !req.path.startsWith('/settings')
-    ) {
-      return res.redirect('/settings');
-    }
-  } catch (error) {
-    console.error('Error checking setup configuration:', error);
-    return res.status(500).send('Internal Server Error');
-  }
-
-  next();
-});
-
-// protectApiRoute middleware extracted to individual route modules
+// Auth + setup check middleware is now applied at the app level in server.js
 
 /**
  * @swagger
