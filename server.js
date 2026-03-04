@@ -481,6 +481,7 @@ app.use('/', require('./routes/manual'));
 app.use('/', require('./routes/history'));
 app.use('/', require('./routes/dashboard'));
 app.use('/', require('./routes/documents'));
+app.use('/', require('./routes/settings'));
 require('./routes/auth');
 const ragRoutes = require('./routes/rag');
 
