@@ -480,6 +480,7 @@ app.use('/', require('./routes/debug'));
 app.use('/', require('./routes/manual'));
 app.use('/', require('./routes/history'));
 app.use('/', require('./routes/dashboard'));
+app.use('/', require('./routes/documents'));
 require('./routes/auth');
 const ragRoutes = require('./routes/rag');
 
