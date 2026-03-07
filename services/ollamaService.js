@@ -211,7 +211,7 @@ class OllamaService extends BaseAIService {
           temperature: 0.7,
           top_p: 0.9,
           num_predict: 1024,
-          num_ctx: numCtx,
+          ...(Number.isFinite(Number(numCtx)) && Number(numCtx) > 0 && { num_ctx: Number(numCtx) }),
         },
       });
 
@@ -497,20 +497,25 @@ class OllamaService extends BaseAIService {
    * @returns {Object}
    */
   async _callOllamaAPI(prompt, systemPrompt, numCtx, schema) {
+    const requestOptions = {
+      temperature: 0.7,
+      top_p: 0.9,
+      repeat_penalty: 1.1,
+      top_k: 7,
+      num_predict: 256,
+    };
+    const parsedNumCtx = Number(numCtx);
+    if (Number.isFinite(parsedNumCtx) && parsedNumCtx > 0) {
+      requestOptions.num_ctx = parsedNumCtx;
+    }
+
     const response = await this.client.post(`${this.apiUrl}/api/generate`, {
       model: this.model,
       prompt: prompt,
       system: systemPrompt,
       stream: false,
       format: schema,
-      options: {
-        temperature: 0.7,
-        top_p: 0.9,
-        repeat_penalty: 1.1,
-        top_k: 7,
-        num_predict: 256,
-        num_ctx: numCtx,
-      },
+      options: requestOptions,
     });
 
     if (!response.data) {
@@ -526,6 +531,23 @@ class OllamaService extends BaseAIService {
    * @returns {Object}
    */
   _processOllamaResponse(responseData) {
+    const emptyAnalysis = {
+      tags: [],
+      correspondent: null,
+      title: null,
+      document_date: null,
+      document_type: null,
+      language: null,
+      custom_fields: null,
+    };
+
+    if (!responseData || typeof responseData !== 'object') {
+      console.warn(
+        '[WARNING] Ollama response payload is missing or invalid, returning empty analysis.'
+      );
+      return emptyAnalysis;
+    }
+
     if (responseData.response && typeof responseData.response === 'object') {
       console.debug('Using structured output response');
       return {
@@ -541,7 +563,17 @@ class OllamaService extends BaseAIService {
       console.debug('Falling back to text response parsing');
       return this._parseResponse(responseData.response);
     } else {
-      throw new Error('No response data from Ollama API');
+      const fallbackText = [responseData.message?.content, responseData.output].find(
+        (v) => typeof v === 'string' && v.trim()
+      );
+
+      if (fallbackText) {
+        console.warn('[WARNING] Ollama response missing `response` field; attempting fallback.');
+        return this._parseResponse(fallbackText);
+      }
+
+      console.warn('[WARNING] Ollama response missing parsable payload. Returning empty analysis.');
+      return emptyAnalysis;
     }
   }
 

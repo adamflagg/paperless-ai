@@ -20,12 +20,32 @@ class SetupService {
     try {
       const envContent = await fs.readFile(this.envPath, 'utf8');
       const config = {};
+
       envContent.split('\n').forEach((line) => {
-        const [key, value] = line.split('=');
-        if (key && value) {
-          config[key.trim()] = value.trim();
+        const trimmedLine = line.trim();
+        if (!trimmedLine || trimmedLine.startsWith('#')) {
+          return;
+        }
+
+        const separatorIndex = trimmedLine.indexOf('=');
+        if (separatorIndex === -1) {
+          return;
+        }
+
+        const key = trimmedLine.slice(0, separatorIndex).trim();
+        const value = trimmedLine.slice(separatorIndex + 1).trim();
+        if (key) {
+          config[key] = value;
         }
       });
+
+      // Runtime/container env vars take precedence over persisted .env values
+      ['PAPERLESS_API_URL', 'PAPERLESS_API_TOKEN', 'PAPERLESS_USERNAME'].forEach((key) => {
+        if (process.env[key]) {
+          config[key] = process.env[key];
+        }
+      });
+
       return config;
     } catch (error) {
       console.error('Error loading config:', error.message);
@@ -110,7 +130,9 @@ class SetupService {
       apiKey: apiKey,
       model: model,
     };
-    console.debug('Custom AI config:', config);
+    const maskedKey =
+      apiKey && apiKey.length > 8 ? apiKey.slice(0, 4) + '****' + apiKey.slice(-4) : '****';
+    console.debug('Custom AI config:', { baseURL: url, apiKey: maskedKey, model: model });
     try {
       const openai = new OpenAI({
         apiKey: config.apiKey,

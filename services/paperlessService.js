@@ -287,7 +287,7 @@ class PaperlessService {
 
     try {
       // Versuche zuerst, den Tag zu erstellen
-      const response = await this.client.post('/tags/', { name: tagName });
+      const response = await this.client.post('/tags/', { name: tagName, owner: null });
       const newTag = response.data;
       console.debug(`Successfully created tag "${tagName}" with ID ${newTag.id}`);
       this.tagCache.set(normalizedName, newTag);
@@ -662,7 +662,7 @@ class PaperlessService {
         const params = {
           page,
           page_size: DEFAULT_PAGE_SIZE,
-          fields: 'id,title,created,created_date,added,tags,correspondent',
+          fields: 'id,title,created,created_date,added,tags,correspondent,checksum',
         };
 
         // Füge Tag-Filter hinzu, wenn Tags definiert sind
@@ -1045,6 +1045,7 @@ class PaperlessService {
       try {
         const createResponse = await this.client.post('/correspondents/', {
           name: name,
+          owner: null,
         });
         console.debug(`Created new correspondent "${name}" with ID ${createResponse.data.id}`);
         return createResponse.data;
@@ -1113,8 +1114,9 @@ class PaperlessService {
     }
   }
 
-  async getOrCreateDocumentType(name) {
+  async getOrCreateDocumentType(name, options = {}) {
     this.initialize();
+    const restrictToExistingDocumentTypes = options.restrictToExistingDocumentTypes ?? false;
 
     try {
       // Suche nach existierendem document_type
@@ -1126,13 +1128,21 @@ class PaperlessService {
         return existingDocType;
       }
 
+      if (restrictToExistingDocumentTypes) {
+        console.debug(
+          `Document type "${name}" does not exist and restrictions are enabled, returning null`
+        );
+        return null;
+      }
+
       // Erstelle neuen document_type
       try {
         const createResponse = await this.client.post('/document_types/', {
           name: name,
-          matching_algorithm: 1, // 1 = ANY
-          match: '', // Optional: Kann später angepasst werden
+          matching_algorithm: 1,
+          match: '',
           is_insensitive: true,
+          owner: null,
         });
         console.debug(`Created new document type "${name}" with ID ${createResponse.data.id}`);
         return createResponse.data;
@@ -1212,6 +1222,19 @@ class PaperlessService {
 
   async getOwnUserID() {
     this.initialize();
+
+    // Primary: try ui_settings endpoint (works with token auth regardless of username)
+    try {
+      const uiResponse = await this.client.get('/ui_settings/');
+      if (uiResponse.data?.user?.id) {
+        console.debug(`Found own user ID via ui_settings: ${uiResponse.data.user.id}`);
+        return uiResponse.data.user.id;
+      }
+    } catch (error) {
+      console.debug('ui_settings lookup failed, falling back to /users/:', error.message);
+    }
+
+    // Fallback: match by username
     try {
       const response = await this.client.get('/users/', {
         params: {
@@ -1221,12 +1244,19 @@ class PaperlessService {
       });
 
       if (response.data.results && response.data.results.length > 0) {
-        const userInfo = response.data.results;
-        //filter for username by process.env.PAPERLESS_USERNAME
-        const user = userInfo.find((user) => user.username === process.env.PAPERLESS_USERNAME);
+        const user = response.data.results.find(
+          (u) => u.username === process.env.PAPERLESS_USERNAME
+        );
         if (user) {
-          console.debug(`Found own user ID: ${user.id}`);
+          console.debug(`Found own user ID via username match: ${user.id}`);
           return user.id;
+        }
+        // Last resort: return first user if only one result
+        if (response.data.results.length === 1) {
+          console.debug(
+            `Found own user ID via single-result fallback: ${response.data.results[0].id}`
+          );
+          return response.data.results[0].id;
         }
       }
       return null;
@@ -1278,48 +1308,68 @@ class PaperlessService {
       }
 
       if (currentDoc.correspondent && updates.correspondent) {
-        console.debug(
-          'Document already has a correspondent, keeping existing one:',
-          currentDoc.correspondent
-        );
-        delete updates.correspondent;
+        if (process.env.USE_EXISTING_DATA === 'yes') {
+          console.debug(
+            'Document already has a correspondent, keeping existing one (USE_EXISTING_DATA=yes):',
+            currentDoc.correspondent
+          );
+          delete updates.correspondent;
+        } else {
+          console.debug(
+            'Overwriting existing correspondent with AI suggestion (USE_EXISTING_DATA=no):',
+            updates.correspondent
+          );
+        }
       }
 
       let updateData;
       try {
         if (updates.created) {
-          let dateObject;
-
-          dateObject = parseISO(updates.created);
+          const createdValue = String(updates.created).trim();
+          let dateObject = parseISO(createdValue);
 
           if (!isValid(dateObject)) {
-            dateObject = parse(updates.created, 'dd.MM.yyyy', new Date());
-            if (!isValid(dateObject)) {
-              dateObject = parse(updates.created, 'dd-MM-yyyy', new Date());
+            const dateFormats = [
+              'dd.MM.yyyy',
+              'dd-MM-yyyy',
+              'dd/MM/yyyy',
+              'MM/dd/yyyy',
+              'yyyy/MM/dd',
+            ];
+            for (const dateFormat of dateFormats) {
+              dateObject = parse(createdValue, dateFormat, new Date());
+              if (isValid(dateObject)) break;
             }
           }
 
-          if (!isValid(dateObject)) {
-            console.warn(
-              `Invalid date format: ${updates.created}, using fallback date: 01.01.1990`
-            );
-            dateObject = new Date(1990, 0, 1);
-          }
+          if (isValid(dateObject)) {
+            const normalizedCreated = format(dateObject, 'yyyy-MM-dd');
+            const today = format(new Date(), 'yyyy-MM-dd');
 
-          updateData = {
-            ...updates,
-            created: format(dateObject, 'yyyy-MM-dd'),
-          };
+            if (normalizedCreated > today) {
+              console.warn(
+                `[WARN] Future created date received (${normalizedCreated}), skipping created date update`
+              );
+              delete updates.created;
+              updateData = { ...updates };
+            } else {
+              updateData = { ...updates, created: normalizedCreated };
+            }
+          } else {
+            console.warn(
+              `[WARN] Invalid date format: ${updates.created}, skipping created date update`
+            );
+            delete updates.created;
+            updateData = { ...updates };
+          }
         } else {
           updateData = { ...updates };
         }
       } catch (error) {
         console.warn('Error parsing date:', error.message);
         console.debug('Received Date:', updates);
-        updateData = {
-          ...updates,
-          created: format(new Date(1990, 0, 1), 'yyyy-MM-dd'),
-        };
+        delete updates.created;
+        updateData = { ...updates };
       }
 
       // // Handle custom fields update
@@ -1340,6 +1390,76 @@ class PaperlessService {
       if (updateData.title && updateData.title.length > 128) {
         updateData.title = updateData.title.substring(0, 124) + '…';
         console.warn(`Title truncated to 128 characters for document ${documentId}`);
+      }
+
+      // Sanitize custom fields before sending to Paperless API
+      if (Array.isArray(updateData.custom_fields)) {
+        const sanitizedFields = [];
+
+        for (const [index, cf] of updateData.custom_fields.entries()) {
+          if (!cf || typeof cf !== 'object' || Array.isArray(cf)) {
+            console.warn(
+              `[WARN] Skipping invalid custom field at index ${index} for document ${documentId}`
+            );
+            continue;
+          }
+
+          if (
+            cf.field === undefined ||
+            cf.field === null ||
+            cf.value === undefined ||
+            cf.value === null
+          ) {
+            console.warn(
+              `[WARN] Skipping incomplete custom field at index ${index} for document ${documentId}`
+            );
+            continue;
+          }
+
+          let normalizedValue = cf.value;
+          if (typeof normalizedValue === 'string') {
+            normalizedValue = normalizedValue.trim();
+            if (!normalizedValue) {
+              console.warn(
+                `[WARN] Skipping empty custom field value at index ${index} for document ${documentId}`
+              );
+              continue;
+            }
+            if (normalizedValue.length > 128) {
+              normalizedValue = normalizedValue.substring(0, 128);
+              console.warn(
+                `[WARN] Truncated custom field ${cf.field} to 128 chars for document ${documentId}`
+              );
+            }
+          }
+
+          sanitizedFields.push({ ...cf, value: normalizedValue });
+        }
+
+        if (sanitizedFields.length > 0) {
+          updateData.custom_fields = sanitizedFields;
+        } else {
+          delete updateData.custom_fields;
+        }
+      }
+
+      // Preserve required metadata fields if AI didn't provide them
+      const preserveFields = ['storage_path'];
+      if (process.env.USE_EXISTING_DATA === 'yes') {
+        preserveFields.push('correspondent');
+      }
+      for (const field of preserveFields) {
+        if (
+          updateData[field] === undefined ||
+          updateData[field] === null ||
+          updateData[field] === ''
+        ) {
+          const existing = currentDoc?.[field];
+          if (existing !== undefined && existing !== null && existing !== '') {
+            updateData[field] = existing;
+            console.debug(`[DEBUG] Preserving existing ${field} for document ${documentId}`);
+          }
+        }
       }
 
       console.debug('Final update data:', updateData);

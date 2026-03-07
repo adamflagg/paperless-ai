@@ -15,14 +15,10 @@ function safeCompare(a, b) {
 }
 
 // Public paths that don't require authentication
-const PUBLIC_PATHS = [
-  '/login',
-  '/logout',
-  '/setup',
-  '/health',
-  '/api-docs',
-  '/api/webhook/document',
-];
+const PUBLIC_PATHS = ['/login', '/logout', '/health', '/api-docs', '/api/webhook/document'];
+
+// Import document model for user existence check
+const documentModel = require('../models/document');
 
 /**
  * Centralized auth + setup check middleware.
@@ -32,9 +28,22 @@ const PUBLIC_PATHS = [
  */
 function createAuthSetupMiddleware(setupService) {
   return async (req, res, next) => {
-    // Skip auth for public paths
+    // Skip auth for always-public paths
     if (PUBLIC_PATHS.some((p) => req.path === p || req.path.startsWith(p + '/'))) {
       return next();
+    }
+
+    // /setup is only public during initial setup (no users in DB)
+    if (req.path === '/setup' || req.path.startsWith('/setup/')) {
+      try {
+        const users = await documentModel.getUsers();
+        if (!users || users.length === 0) {
+          return next();
+        }
+      } catch (error) {
+        console.error('Error checking users for setup auth:', error.message);
+      }
+      // Users exist — fall through to normal auth
     }
 
     // Auth: API key or JWT

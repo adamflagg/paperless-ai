@@ -27,9 +27,6 @@ module.exports = {
   /** max_tokens sent to Azure / Custom OpenAI for text-generation calls */
   GENERATE_TEXT_MAX_TOKENS: 1000,
 
-  /** max_tokens sent to Custom OpenAI for generateText (large context) */
-  CUSTOM_GENERATE_TEXT_MAX_TOKENS: 128000,
-
   // ---------------------------------------------------------------------------
   // Timeouts
   // ---------------------------------------------------------------------------
