@@ -207,7 +207,7 @@ async function processDocument(
   existingCorrespondentList,
   existingDocumentTypesList
 ) {
-  const isProcessed = await documentModel.isDocumentProcessed(doc.id);
+  const isProcessed = await documentModel.isDocumentProcessed(doc.id, doc.checksum);
   if (isProcessed) return null;
   await documentModel.setProcessingStatus(doc.id, doc.title, 'processing');
 
@@ -226,7 +226,7 @@ async function processDocument(
     paperlessService.getDocument(doc.id),
   ]);
 
-  if (!content || !content.length >= 10) {
+  if (!content || content.length < 10) {
     console.debug(`Document ${doc.id} has no content, skipping analysis`);
     return null;
   }
@@ -289,7 +289,11 @@ async function buildUpdateData(analysis, doc) {
   if (config.limitFunctions?.activateDocumentType !== 'no' && analysis.document.document_type) {
     try {
       const documentType = await paperlessService.getOrCreateDocumentType(
-        analysis.document.document_type
+        analysis.document.document_type,
+        {
+          restrictToExistingDocumentTypes:
+            process.env.RESTRICT_TO_EXISTING_DOCUMENT_TYPES === 'yes',
+        }
       );
       if (documentType) {
         updateData.document_type = documentType.id;
@@ -315,8 +319,16 @@ async function buildUpdateData(analysis, doc) {
     for (const key in customFields) {
       const customField = customFields[key];
 
-      if (!customField.field_name || !customField.value?.trim()) {
-        console.debug('Skipping empty/invalid custom field');
+      if (!customField.field_name) {
+        console.debug('Skipping custom field with no field_name');
+        continue;
+      }
+
+      const value =
+        typeof customField.value === 'string' ? customField.value.trim() : customField.value;
+
+      if (value === undefined || value === null || value === '') {
+        console.debug('Skipping empty custom field:', customField.field_name);
         continue;
       }
 
@@ -324,7 +336,7 @@ async function buildUpdateData(analysis, doc) {
       if (fieldDetails?.id) {
         processedFields.push({
           field: fieldDetails.id,
-          value: customField.value.trim(),
+          value: value,
         });
         processedFieldIds.add(fieldDetails.id);
       }
@@ -364,7 +376,7 @@ async function buildUpdateData(analysis, doc) {
   return updateData;
 }
 
-async function saveDocumentChanges(docId, updateData, analysis, originalData) {
+async function saveDocumentChanges(docId, updateData, analysis, originalData, checksum) {
   const {
     tags: originalTags,
     correspondent: originalCorrespondent,
@@ -374,13 +386,17 @@ async function saveDocumentChanges(docId, updateData, analysis, originalData) {
   await Promise.all([
     documentModel.saveOriginalData(docId, originalTags, originalCorrespondent, originalTitle),
     paperlessService.updateDocument(docId, updateData),
-    documentModel.addProcessedDocument(docId, updateData.title),
-    documentModel.addOpenAIMetrics(
-      docId,
-      analysis.metrics.promptTokens,
-      analysis.metrics.completionTokens,
-      analysis.metrics.totalTokens
-    ),
+    documentModel.addProcessedDocument(docId, updateData.title, checksum),
+    ...(analysis.metrics
+      ? [
+          documentModel.addOpenAIMetrics(
+            docId,
+            analysis.metrics.promptTokens ?? 0,
+            analysis.metrics.completionTokens ?? 0,
+            analysis.metrics.totalTokens ?? 0
+          ),
+        ]
+      : []),
     documentModel.addToHistory(
       docId,
       updateData.tags,
@@ -428,9 +444,10 @@ async function scanInitial() {
 
         const { analysis, originalData } = result;
         const updateData = await buildUpdateData(analysis, doc);
-        await saveDocumentChanges(doc.id, updateData, analysis, originalData);
+        await saveDocumentChanges(doc.id, updateData, analysis, originalData, doc.checksum);
       } catch (error) {
         console.error(`Error processing document ${doc.id}:`, error);
+        await documentModel.setProcessingStatus(doc.id, doc.title, 'complete').catch(() => {});
       }
     }
   } catch (error) {
@@ -478,9 +495,10 @@ async function scanDocuments() {
 
         const { analysis, originalData } = result;
         const updateData = await buildUpdateData(analysis, doc);
-        await saveDocumentChanges(doc.id, updateData, analysis, originalData);
+        await saveDocumentChanges(doc.id, updateData, analysis, originalData, doc.checksum);
       } catch (error) {
         console.error(`Error processing document ${doc.id}:`, error);
+        await documentModel.setProcessingStatus(doc.id, doc.title, 'complete').catch(() => {});
       }
     }
   } catch (error) {

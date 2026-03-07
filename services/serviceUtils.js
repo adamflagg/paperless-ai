@@ -3,6 +3,21 @@ const fs = require('fs').promises;
 const path = require('path');
 const { MAX_LOG_FILE_SIZE } = require('../config/constants');
 
+function normalizeTextInput(value) {
+  if (typeof value === 'string') return value;
+  if (value == null) return '';
+  if (Buffer.isBuffer(value)) return value.toString('utf8');
+  if (value instanceof Uint8Array) return Buffer.from(value).toString('utf8');
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value);
+    } catch (_e) {
+      return String(value);
+    }
+  }
+  return String(value);
+}
+
 // Map non-OpenAI models to compatible OpenAI encodings or use estimation
 function getCompatibleModel(model) {
   const openaiModels = [
@@ -72,18 +87,19 @@ function estimateTokensForNonOpenAI(text) {
 
 // Calculate tokens for a given text
 async function calculateTokens(text, model = process.env.OPENAI_MODEL || 'gpt-4o-mini') {
+  const normalizedText = normalizeTextInput(text);
   try {
     const compatibleModel = getCompatibleModel(model);
 
     if (!compatibleModel) {
       // Non-OpenAI model - use character-based estimation
       console.debug(`Using character-based token estimation for model: ${model}`);
-      return estimateTokensForNonOpenAI(text);
+      return estimateTokensForNonOpenAI(normalizedText);
     }
 
     // OpenAI model - use tiktoken
     const tokenizer = tiktoken.encoding_for_model(compatibleModel);
-    const tokens = tokenizer.encode(text);
+    const tokens = tokenizer.encode(normalizedText);
     const tokenCount = tokens.length;
     tokenizer.free();
 
@@ -93,7 +109,7 @@ async function calculateTokens(text, model = process.env.OPENAI_MODEL || 'gpt-4o
       `Tiktoken failed for model ${model}, falling back to character estimation:`,
       error.message
     );
-    return estimateTokensForNonOpenAI(text);
+    return estimateTokensForNonOpenAI(normalizedText);
   }
 }
 
@@ -236,4 +252,5 @@ module.exports = {
   calculateTotalPromptTokens,
   truncateToTokenLimit,
   writePromptToFile,
+  normalizeTextInput,
 };

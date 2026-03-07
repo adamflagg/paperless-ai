@@ -27,7 +27,6 @@ describe('constants', () => {
       'EXTERNAL_API_DATA_MAX_TOKENS',
       'STATUS_CHECK_MAX_TOKENS',
       'GENERATE_TEXT_MAX_TOKENS',
-      'CUSTOM_GENERATE_TEXT_MAX_TOKENS',
       'OLLAMA_TIMEOUT_MS',
       'MANUAL_SERVICE_TIMEOUT_MS',
       'SETUP_VALIDATION_MAX_RETRIES',
@@ -49,7 +48,6 @@ describe('constants', () => {
       'EXTERNAL_API_DATA_MAX_TOKENS',
       'STATUS_CHECK_MAX_TOKENS',
       'GENERATE_TEXT_MAX_TOKENS',
-      'CUSTOM_GENERATE_TEXT_MAX_TOKENS',
       'OLLAMA_TIMEOUT_MS',
       'MANUAL_SERVICE_TIMEOUT_MS',
       'SETUP_VALIDATION_MAX_RETRIES',
@@ -96,16 +94,6 @@ describe('constants', () => {
 
     it('GENERATE_TEXT_MAX_TOKENS is a positive number', () => {
       expect(constants.GENERATE_TEXT_MAX_TOKENS).toBeGreaterThan(0);
-    });
-
-    it('CUSTOM_GENERATE_TEXT_MAX_TOKENS is a positive number', () => {
-      expect(constants.CUSTOM_GENERATE_TEXT_MAX_TOKENS).toBeGreaterThan(0);
-    });
-
-    it('CUSTOM_GENERATE_TEXT_MAX_TOKENS >= GENERATE_TEXT_MAX_TOKENS', () => {
-      expect(constants.CUSTOM_GENERATE_TEXT_MAX_TOKENS).toBeGreaterThanOrEqual(
-        constants.GENERATE_TEXT_MAX_TOKENS
-      );
     });
 
     it('STATUS_CHECK_MAX_TOKENS is smaller than GENERATE_TEXT_MAX_TOKENS', () => {

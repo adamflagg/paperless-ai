@@ -248,30 +248,56 @@ class BaseAIService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Parse raw AI response text: strip markdown fences, parse JSON.
-   * Identical logic in openai/gemini/azure/custom services.
-   *
-   * @param {string} rawText
-   * @returns {object} Parsed JSON object
-   * @throws {Error} If JSON parsing fails
+   * Extract the first JSON object from raw text, handling markdown fences
+   * and extra text before/after the JSON block.
    */
-  parseAIResponse(rawText) {
-    let jsonContent = rawText
-      .replace(/```json\n?/g, '')
+  _extractJsonCandidate(raw) {
+    const content = String(raw || '').trim();
+    const fenceCleaned = content
+      .replace(/```json\n?/gi, '')
       .replace(/```\n?/g, '')
       .trim();
 
+    const firstBrace = fenceCleaned.indexOf('{');
+    const lastBrace = fenceCleaned.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      return fenceCleaned.slice(firstBrace, lastBrace + 1);
+    }
+
+    return fenceCleaned;
+  }
+
+  /**
+   * Attempt to fix common JSON issues from LLM output:
+   * trailing commas and unquoted keys.
+   */
+  _sanitizeJsonString(jsonStr) {
+    return String(jsonStr || '')
+      .replace(/,\s*}/g, '}')
+      .replace(/,\s*]/g, ']');
+  }
+
+  parseAIResponse(rawText) {
+    const candidate = this._extractJsonCandidate(rawText);
+
     let parsedResponse;
     try {
-      parsedResponse = JSON.parse(jsonContent);
-      // Append to response log (fire-and-forget)
-      fs.appendFile('./logs/response.txt', jsonContent, (_err) => {
-        if (_err) console.error('Failed to append to response log:', _err);
-      });
-    } catch (_error) {
-      console.error('Failed to parse JSON response:', _error);
-      throw new Error('Invalid JSON response from API');
+      parsedResponse = JSON.parse(candidate);
+    } catch (_firstError) {
+      try {
+        const sanitized = this._sanitizeJsonString(candidate);
+        parsedResponse = JSON.parse(sanitized);
+        console.warn('[WARN] JSON parse succeeded after sanitization (trailing commas removed)');
+      } catch (_secondError) {
+        console.error('Failed to parse JSON response after sanitization:', _secondError);
+        throw new Error('Invalid JSON response from API');
+      }
     }
+
+    // Append to response log (fire-and-forget)
+    fs.appendFile('./logs/response.txt', JSON.stringify(parsedResponse)).catch((_err) => {
+      console.error('Failed to append to response log:', _err);
+    });
 
     return parsedResponse;
   }

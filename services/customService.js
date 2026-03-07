@@ -1,10 +1,7 @@
 const { truncateToTokenLimit } = require('./serviceUtils');
 const OpenAI = require('openai');
 const config = require('../config/config');
-const {
-  CUSTOM_GENERATE_TEXT_MAX_TOKENS,
-  GENERATE_TEXT_MAX_TOKENS,
-} = require('../config/constants');
+const { GENERATE_TEXT_MAX_TOKENS } = require('../config/constants');
 const BaseAIService = require('./baseAIService');
 
 class CustomOpenAIService extends BaseAIService {
@@ -153,12 +150,15 @@ class CustomOpenAIService extends BaseAIService {
       }
 
       const model = config.custom.model;
+      const configuredTokens = Number(config.responseTokens);
+      const maxTokens =
+        Number.isFinite(configuredTokens) && configuredTokens > 0 ? configuredTokens : 1000;
 
       const response = await this.client.chat.completions.create({
         model: model,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
-        max_tokens: CUSTOM_GENERATE_TEXT_MAX_TOKENS,
+        max_tokens: maxTokens,
       });
 
       if (!response?.choices?.[0]?.message?.content) {

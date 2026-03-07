@@ -27,6 +27,13 @@ const createTableMain = db.prepare(`
 `);
 createTableMain.run();
 
+// Migration: add content_checksum column if not present
+try {
+  db.prepare('ALTER TABLE processed_documents ADD COLUMN content_checksum TEXT').run();
+} catch (_e) {
+  // Column already exists — ignore
+}
+
 const createTableMetrics = db.prepare(`
   CREATE TABLE IF NOT EXISTS openai_metrics (
     id INTEGER PRIMARY KEY,
@@ -75,10 +82,11 @@ userTable.run();
 
 // Prepare statements for better performance
 const insertDocument = db.prepare(`
-  INSERT INTO processed_documents (document_id, title) 
-  VALUES (?, ?)
+  INSERT INTO processed_documents (document_id, title, content_checksum)
+  VALUES (?, ?, ?)
   ON CONFLICT(document_id) DO UPDATE SET
-    last_updated = CURRENT_TIMESTAMP
+    last_updated = CURRENT_TIMESTAMP,
+    content_checksum = excluded.content_checksum
   WHERE document_id = ?
 `);
 
@@ -141,16 +149,17 @@ const clearProcessingStatus = db.prepare(`
 `);
 
 const getActiveProcessing = db.prepare(`
-  SELECT * FROM processing_status 
-  WHERE start_time >= datetime('now', '-30 seconds')
-  ORDER BY start_time DESC LIMIT 1
+  SELECT * FROM processing_status
+  WHERE start_time >= datetime('now', '-10 minutes')
+  ORDER BY start_time DESC
+  LIMIT 1
 `);
 
 module.exports = {
-  async addProcessedDocument(documentId, title) {
+  async addProcessedDocument(documentId, title, checksum) {
     try {
       // Bei UNIQUE constraint failure wird der existierende Eintrag aktualisiert
-      const result = insertDocument.run(documentId, title, documentId);
+      const result = insertDocument.run(documentId, title, checksum || null, documentId);
       if (result.changes > 0) {
         console.log(
           `[DEBUG] Document ${title} ${result.lastInsertRowid ? 'added to' : 'updated in'} processed_documents`
@@ -206,10 +215,16 @@ module.exports = {
     }
   },
 
-  async isDocumentProcessed(documentId) {
+  isDocumentProcessed(documentId, checksum) {
     try {
-      const row = findDocument.get(documentId);
-      return !!row;
+      const doc = findDocument.get(documentId);
+      if (!doc) return false;
+      // If checksum provided and stored, compare — detect recycled IDs
+      if (checksum && doc.content_checksum && doc.content_checksum !== checksum) {
+        console.debug(`Document ${documentId} has different checksum — recycled ID detected`);
+        return false;
+      }
+      return true;
     } catch (error) {
       console.error('[ERROR] checking document:', error);
       // Im Zweifelsfall true zurückgeben, um doppelte Verarbeitung zu vermeiden
